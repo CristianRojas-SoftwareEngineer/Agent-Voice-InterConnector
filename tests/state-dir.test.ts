@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Resolución del state dir en los tres SO, incluyendo env vars ausentes.
 // Dos de las tres ramas nunca se ejecutan en la máquina de desarrollo: se
 // ejercitan falsificando process.platform (os.platform() lo refleja).

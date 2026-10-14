@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Topes deterministas: clampHead conserva la cabeza cortando en párrafo;
 // clampSentences acumula oraciones completas y frena por dos topes a la vez —
 // el de oraciones (criterio de selección) y el de caracteres (freno de

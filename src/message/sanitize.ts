@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Normalización del texto para voz: convierte texto potencialmente con markdown,
 // código y símbolos en texto plano apto para leerse en voz alta. Se aplica tanto
 // a la salida del LLM (los modelos free no siempre obedecen el formato) como al

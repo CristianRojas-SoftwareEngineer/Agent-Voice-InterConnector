@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Resolución del binario ai-voice-interconnector en el PATH, con la lógica condicional
 // por SO (PATHEXT en Windows) que es fácil de romper sin notar desde una sola
 // plataforma de desarrollo.

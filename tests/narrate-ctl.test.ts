@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // La superficie que invoca la skill: cada subcomando de narrate-ctl como
 // subproceso real sobre dist/narrate-ctl.js (check-dist garantiza que dist/
 // refleja src/), con el state dir redirigido a un temporal vía env vars del SO

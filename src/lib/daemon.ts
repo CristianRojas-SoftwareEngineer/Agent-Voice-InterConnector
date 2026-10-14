@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Consulta y arranque del daemon de AI-Voice-InterConnector vía su CLI pública. El daemon
 // mantiene el modelo en memoria: `speak --daemon` lo requiere corriendo (no lo
 // arranca solo). El health-check lo levanta de forma desanclada al iniciar sesión.

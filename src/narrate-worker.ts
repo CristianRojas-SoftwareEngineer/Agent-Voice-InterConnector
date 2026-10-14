@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // WORKER (proceso independiente del hook). Hace todo el trabajo con latencia: instancia única que ESPERA al worker anterior en vez de interrumpirlo (la narración en curso suena completa antes de la siguiente; sin solapamiento), construcción del mensaje y narración vía el CLI. Degrada en silencio; los errores van a worker.log.
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { loadConfig } from "./lib/config.js";

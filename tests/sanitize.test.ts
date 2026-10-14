@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // La barrera de saneamiento antes de narrar o de enviar texto a un LLM externo:
 // verifica que efectivamente quita lo que dice quitar. Comportamiento portado de
 // normalize-speech-text del Orchestrator (§4 fila 11), con dos desviaciones

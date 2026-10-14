@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Tests de contrato de los adaptadores Gemini/OpenRouter con fetch mockeado:
 // serialización del mensaje único, parseo de la respuesta, HTTP no-ok y
 // respuesta vacía. Nunca tocan la red.

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Desanclaje y terminación de procesos. El desanclaje es multiplataforma con una
 // sola API; la terminación del árbol es la única bifurcación por SO del plugin.
 import { spawn, spawnSync } from "node:child_process";

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // LAUNCHER (fire-and-forget). Corre DENTRO del hook de Claude Code: lee el
 // payload, decide si narrar, lo persiste y lanza el worker desanclado. Debe
 // salir en <100 ms — nada de red, síntesis ni espera. Sirve a los cinco hooks

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Resuelve el ejecutable `ai-voice-interconnector` recorriendo el PATH, con las
 // extensiones adecuadas por SO. Los instaladores nativos por SO
 // (install-windows.ps1, install-linux.sh, install-macos.sh) dejan el CLI en el

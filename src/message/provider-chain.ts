@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Composición genérica primario → fallback de proveedores de texto. Cualquier
 // fallo (sin key, HTTP >= 400 incluido 429, timeout, respuesta vacía) pasa al
 // siguiente nivel. La cadena de LLMs puede fallar entera: el modo local (fuera

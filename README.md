@@ -144,4 +144,4 @@ El CI (CircleCI, [.circleci/config.yml](.circleci/config.yml)) corre `typecheck`
 
 ## Licencia
 
-GPL-3.0-or-later.
+MPL-2.0. Ver `LICENSE` y `NOTICE`.

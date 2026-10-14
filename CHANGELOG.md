@@ -20,6 +20,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Cambiado
 
+- **Licencia del proyecto: de `GPL-3.0-or-later` a `MPL-2.0`** (copyleft a nivel de
+  archivo, en paridad con el motor AI-Voice-InterConnector). Quien modifique archivos
+  cubiertos debe publicarlos bajo MPL-2.0; la obra mayor que los combina puede
+  mantener su licencia propia. Ver `LICENSE` y `NOTICE`.
 - **Migración al motor AI-Voice-InterConnector**: la narración invoca
   `speech say --text … --daemon` en lugar del comando `speak`, eliminado sin
   alias en el rediseño de CLI — con el comando anterior el plugin quedaba mudo

@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Compila los entry points de src/ a bundles autocontenidos en dist/ con esbuild.
 // Sin --check: escribe dist/. Con --check: verifica que dist/ está sincronizado
 // con src/ (usado por CI) sin tocar el árbol.

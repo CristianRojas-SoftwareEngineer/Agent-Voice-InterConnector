@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Proveedor de fallback: OpenRouter con modelos :free vía fetch nativo, sin SDK.
 // Formato Anthropic Messages (/api/v1/messages), igual que el Orchestrator (§5.4),
 // para máxima fidelidad con lo probado. Absorbe los 429 y caídas de Gemini.

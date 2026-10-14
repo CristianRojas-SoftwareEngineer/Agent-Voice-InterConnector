@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Hook de SessionStart: verifica una sola vez por sesión que la cadena de
 // narración está completa (CLI en PATH + modelo cacheado) y, si todo está listo,
 // deja el daemon en marcha para que speak --daemon esté caliente durante la

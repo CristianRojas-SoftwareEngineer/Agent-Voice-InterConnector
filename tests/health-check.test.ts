@@ -1,3 +1,9 @@
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+// Copyright (c) 2026 Cristián Rojas Arredondo.
+// SPDX-License-Identifier: MPL-2.0
+
 // Hook de SessionStart (dist/health-check.js) como subproceso real, con un CLI
 // `ai-voice-interconnector` falso en el PATH que responde a `doctor --json`,
 // `daemon status --json` y `daemon start`. Fija por contrato el veredicto sobre
