@@ -155,14 +155,16 @@ function startDaemonDetached(cliPath) {
 
 // src/lib/health-decision.ts
 var NOT_PROVISIONED_MESSAGE = "tts-sidecar-narrator: el entorno de voz no est\xE1 provisionado. Ejecuta ai-voice-interconnector setup para habilitar la narraci\xF3n por voz.";
+var DOCTOR_FAILED_MESSAGE = "tts-sidecar-narrator: el diagn\xF3stico del motor (doctor) fall\xF3 y no produjo un veredicto. Ejecuta ai-voice-interconnector doctor --json manualmente.";
+var DOCTOR_JSON_HINT = "Ejecuta ai-voice-interconnector doctor --json para el detalle.";
 function parseFirstJsonObject(text) {
-  const start = text.indexOf("{");
-  if (start < 0) return void 0;
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return void 0;
   let depth = 0;
   let inString = false;
   let escaped = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
     if (inString) {
       if (escaped) escaped = false;
       else if (ch === "\\") escaped = true;
@@ -174,8 +176,9 @@ function parseFirstJsonObject(text) {
     else if (ch === "}") {
       depth--;
       if (depth === 0) {
+        if (trimmed.slice(i + 1).trim() !== "") return void 0;
         try {
-          return JSON.parse(text.slice(start, i + 1));
+          return JSON.parse(trimmed.slice(0, i + 1));
         } catch {
           return void 0;
         }
@@ -184,13 +187,61 @@ function parseFirstJsonObject(text) {
   }
   return void 0;
 }
-function decideHealthAction(report, daemonRunning) {
-  if (!report) return { kind: "noop" };
-  if (report.status === "failed") {
-    return { kind: "notify", message: NOT_PROVISIONED_MESSAGE };
+function isValidReport(value) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
   }
-  if (report.status === "ok" && !daemonRunning) return { kind: "warm" };
-  return { kind: "noop" };
+  const record = value;
+  if (!Array.isArray(record.failed) || !record.failed.every((f) => typeof f === "string")) {
+    return false;
+  }
+  if (!Array.isArray(record.checks)) return false;
+  for (const check of record.checks) {
+    if (typeof check !== "object" || check === null) return false;
+    const c = check;
+    if (typeof c.name !== "string" || typeof c.ok !== "boolean" || typeof c.detail !== "string") {
+      return false;
+    }
+  }
+  if (record.models !== void 0) {
+    if (typeof record.models !== "object" || record.models === null) {
+      return false;
+    }
+    const models = record.models;
+    if (models.missing !== void 0 && (!Array.isArray(models.missing) || !models.missing.every((m) => typeof m === "string"))) {
+      return false;
+    }
+  }
+  return true;
+}
+function buildFailedMessage(report) {
+  const parts = report.failed.map((name) => {
+    const check = report.checks.find((c) => c.name === name);
+    if (name === "models_provisioned") {
+      const missing = Array.isArray(report.models?.missing) ? report.models.missing.filter((m) => typeof m === "string") : [];
+      const missingNote = missing.length > 0 ? ` Modelos sin provisionar: ${missing.join(", ")}.` : "";
+      return `${name}: ${NOT_PROVISIONED_MESSAGE}${missingNote}`;
+    }
+    const detail = check ? check.detail : "";
+    return detail ? `${name}: ${detail}.` : `${name}.`;
+  });
+  return `tts-sidecar-narrator: el diagn\xF3stico del motor reporta chequeos fallidos. ${parts.join(" ")} ${DOCTOR_JSON_HINT}`;
+}
+function decideHealthAction(input) {
+  const { exitCode, report } = input;
+  if (isValidReport(report)) {
+    if (exitCode === 0 && report.failed.length === 0) {
+      return { kind: "healthy" };
+    }
+    if (exitCode === 1 && report.failed.length > 0) {
+      return { kind: "notify", message: buildFailedMessage(report) };
+    }
+    return { kind: "uncertain" };
+  }
+  if (exitCode === 1 && typeof report === "object" && report !== null && report.reason === "doctor_failed") {
+    return { kind: "notify", message: DOCTOR_FAILED_MESSAGE };
+  }
+  return { kind: "uncertain" };
 }
 
 // src/health-check.ts

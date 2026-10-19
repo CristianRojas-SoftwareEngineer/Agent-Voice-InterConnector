@@ -4,43 +4,64 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// Decisión pura del hook de SessionStart: mapea el reporte de `doctor --json` y
-// el estado del daemon a un veredicto (avisar / calentar / nada), sin efectos ni
-// I/O. Concentra el tipo del reporte, el parser del JSON y el criterio, de modo
-// que main() quede como cableado delgado y la lógica sea verificable en aislado.
+// Decisión pura del hook de SessionStart contra el contrato v0.34.0 de
+// `doctor --json` (DOCTOR.md del tag del motor): el comando emite exactamente
+// un objeto JSON con `failed: string[]` y `checks: {name, ok, detail}[]`, y el
+// veredicto sale del exit más el reporte válido —nunca de un campo `status`
+// que el motor no emite. Concentra el tipo del reporte, el parser de un único
+// objeto completo y el criterio, de modo que main() quede como cableado
+// delgado y la lógica sea verificable en aislado. Sin efectos ni I/O.
 
-export interface DoctorReport {
-  status: "ok" | "failed";
-  issues?: string[];
-  data_dir?: string;
-  hf_cache?: string;
-  base_status?: string;
+export interface DoctorCheck {
+  name: string;
+  ok: boolean;
+  detail: string;
 }
 
-/** Veredicto discriminado del health-check: avisar, calentar el daemon, o nada. */
-export type Decision =
-  { kind: "notify"; message: string } | { kind: "warm" } | { kind: "noop" };
+export interface DoctorReport {
+  failed: string[];
+  checks: DoctorCheck[];
+  models?: { missing?: string[] };
+}
 
-/** Aviso por entorno de voz no provisionado (status "failed"). Fuente única. */
+/**
+ * Veredicto discriminado del health-check: diagnóstico sano (única rama que
+ * puede requerir calentar el daemon), aviso al usuario con mensaje acotado, o
+ * estado incierto (sin daemon ni remedio inventado).
+ */
+export type Decision =
+  | { kind: "healthy" }
+  | { kind: "notify"; message: string }
+  | { kind: "uncertain" };
+
+/** Aviso base por entorno de voz no provisionado. Fuente única. */
 export const NOT_PROVISIONED_MESSAGE =
   "tts-sidecar-narrator: el entorno de voz no está provisionado. Ejecuta " +
   "ai-voice-interconnector setup para habilitar la narración por voz.";
 
+/** Aviso cuando `doctor` falla como comando (reason doctor_failed). */
+const DOCTOR_FAILED_MESSAGE =
+  "tts-sidecar-narrator: el diagnóstico del motor (doctor) falló y no produjo " +
+  "un veredicto. Ejecuta ai-voice-interconnector doctor --json manualmente.";
+
+const DOCTOR_JSON_HINT =
+  "Ejecuta ai-voice-interconnector doctor --json para el detalle.";
+
 /**
- * Extrae el primer objeto JSON de nivel superior del texto y lo parsea. En caso
- * de fallo, `doctor --json` concatena dos objetos (el reporte y un {error,…});
- * el recorrido por profundidad de llaves (respetando cadenas y escapes) toma
- * solo el primero e ignora cualquier objeto posterior. Devuelve undefined si no
- * hay un objeto balanceado o el fragmento no parsea.
+ * Extrae el ÚNICO objeto JSON de la salida y lo parsea. El motor emite
+ * exactamente un objeto: cualquier contenido tras su cierre (p. ej. un objeto
+ * concatenado) convierte la salida en inválida y devuelve undefined, en lugar
+ * de extraer el primer objeto. También devuelve undefined si el texto no
+ * empieza por un objeto o el fragmento no parsea.
  */
-export function parseFirstJsonObject(text: string): DoctorReport | undefined {
-  const start = text.indexOf("{");
-  if (start < 0) return undefined;
+export function parseFirstJsonObject(text: string): unknown {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return undefined;
   let depth = 0;
   let inString = false;
   let escaped = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
     if (inString) {
       if (escaped) escaped = false;
       else if (ch === "\\") escaped = true;
@@ -52,8 +73,9 @@ export function parseFirstJsonObject(text: string): DoctorReport | undefined {
     else if (ch === "}") {
       depth--;
       if (depth === 0) {
+        if (trimmed.slice(i + 1).trim() !== "") return undefined;
         try {
-          return JSON.parse(text.slice(start, i + 1)) as DoctorReport;
+          return JSON.parse(trimmed.slice(0, i + 1));
         } catch {
           return undefined;
         }
@@ -63,20 +85,104 @@ export function parseFirstJsonObject(text: string): DoctorReport | undefined {
   return undefined;
 }
 
-/**
- * Decisión pura y total del health-check. Para cualquier combinación de reporte
- * (o su ausencia) y estado del daemon devuelve exactamente un veredicto, sin
- * ejecutar I/O: sin reporte ⇒ nada; "failed" ⇒ avisar; "ok" + daemon detenido ⇒
- * calentar; resto ⇒ nada.
- */
-export function decideHealthAction(
-  report: DoctorReport | undefined,
-  daemonRunning: boolean,
-): Decision {
-  if (!report) return { kind: "noop" };
-  if (report.status === "failed") {
-    return { kind: "notify", message: NOT_PROVISIONED_MESSAGE };
+/** ¿El valor parseado tiene el shape mínimo del reporte v0.34.0? */
+function isValidReport(value: unknown): value is DoctorReport {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
   }
-  if (report.status === "ok" && !daemonRunning) return { kind: "warm" };
-  return { kind: "noop" };
+  const record = value as Record<string, unknown>;
+  if (
+    !Array.isArray(record.failed) ||
+    !record.failed.every((f) => typeof f === "string")
+  ) {
+    return false;
+  }
+  if (!Array.isArray(record.checks)) return false;
+  for (const check of record.checks) {
+    if (typeof check !== "object" || check === null) return false;
+    const c = check as Record<string, unknown>;
+    if (
+      typeof c.name !== "string" ||
+      typeof c.ok !== "boolean" ||
+      typeof c.detail !== "string"
+    ) {
+      return false;
+    }
+  }
+  if (record.models !== undefined) {
+    if (typeof record.models !== "object" || record.models === null) {
+      return false;
+    }
+    const models = record.models as Record<string, unknown>;
+    if (
+      models.missing !== undefined &&
+      (!Array.isArray(models.missing) ||
+        !models.missing.every((m) => typeof m === "string"))
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Mensaje único de aviso con TODOS los checks fallidos, sin ocultar ninguno.
+ * `models_provisioned` es el único con mensaje de `setup` (incluye
+ * `models.missing` si es array de cadenas); el resto muestra nombre/detalle y
+ * remite a `doctor --json`. Los checks desconocidos se nombran sin remedio
+ * inventado.
+ */
+function buildFailedMessage(report: DoctorReport): string {
+  const parts = report.failed.map((name) => {
+    const check = report.checks.find((c) => c.name === name);
+    if (name === "models_provisioned") {
+      const missing = Array.isArray(report.models?.missing)
+        ? report.models.missing.filter((m): m is string => typeof m === "string")
+        : [];
+      const missingNote =
+        missing.length > 0
+          ? ` Modelos sin provisionar: ${missing.join(", ")}.`
+          : "";
+      return `${name}: ${NOT_PROVISIONED_MESSAGE}${missingNote}`;
+    }
+    const detail = check ? check.detail : "";
+    return detail ? `${name}: ${detail}.` : `${name}.`;
+  });
+  return (
+    "tts-sidecar-narrator: el diagnóstico del motor reporta chequeos " +
+    `fallidos. ${parts.join(" ")} ${DOCTOR_JSON_HINT}`
+  );
+}
+
+/**
+ * Decisión pura y total del health-check sobre exit + reporte. Cuatro filas:
+ * (exit 0 + reporte válido + failed vacío) → sano; (exit 1 + reporte válido +
+ * failed no vacío) → aviso por cada check fallido; (exit 1 + objeto de error
+ * `doctor_failed`) → aviso de fallo del diagnóstico; cualquier otra
+ * combinación (exit incoherente, shape inválido, JSON malformado, timeout o
+ * error de ejecución) → incierto, sin daemon ni remedio inventado.
+ */
+export function decideHealthAction(input: {
+  exitCode: number | null;
+  report: unknown;
+}): Decision {
+  const { exitCode, report } = input;
+  if (isValidReport(report)) {
+    if (exitCode === 0 && report.failed.length === 0) {
+      return { kind: "healthy" };
+    }
+    if (exitCode === 1 && report.failed.length > 0) {
+      return { kind: "notify", message: buildFailedMessage(report) };
+    }
+    return { kind: "uncertain" };
+  }
+  if (
+    exitCode === 1 &&
+    typeof report === "object" &&
+    report !== null &&
+    (report as Record<string, unknown>).reason === "doctor_failed"
+  ) {
+    return { kind: "notify", message: DOCTOR_FAILED_MESSAGE };
+  }
+  return { kind: "uncertain" };
 }
