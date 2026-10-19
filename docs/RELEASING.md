@@ -61,8 +61,8 @@ En orden; cada paso asume el anterior.
    [`docs/INTEGRATION.md`](INTEGRATION.md) («Requisitos sobre el motor») debe
    ser la que efectivamente se usó en el smoke test del paso 6.
 5. **Verificar referencias cruzadas en ambos repos**: el motor referencia al
-   plugin en `docs/CLAUDE-CODE-INTEGRATION.md` y su diseño en `docs/DESIGN.md`
-   (del repo del motor);
+   plugin en `docs/CLI/CONTRACT.md` (§12 «Contratos externos» del tag
+   verificado) y su diseño en `docs/DESIGN.md` (del repo del motor);
    el plugin referencia al motor en `docs/INTEGRATION.md` y el README. Ambos
    lados deben apuntar a las versiones etiquetadas (o al menos no
    contradecirlas). Esta verificación vive aquí y no en el checklist del
@@ -155,6 +155,17 @@ Notas de contrato que el runbook asume (verificado en código fuente):
   (pipeline TTS + daemon); **no** ejercita la generación de mensaje (`local`/`llm`).
 - `worker.log` (en `$STATE_DIR`) registra **solo errores** de narración, no qué
   proveedor se usó; la distinción `local` vs `llm` se verifica **por audible**.
+- **Versión instalada vs. `$MOTOR_VERSION`**: `ai-voice-interconnector version`
+  imprime la versión del motor con o sin el prefijo `v`; contrasta quitando
+  **solo** ese prefijo a ambos lados antes de comparar (Fase 2, paso 1b):
+
+  ```powershell
+  $reportada = ((ai-voice-interconnector version).Trim() -split '\s+')[-1] -replace '^v', ''
+  $esperada  = $MOTOR_VERSION -replace '^v', ''
+  if ($reportada -ne $esperada) {
+    throw "Motor instalado $reportada, se esperaba $esperada ($MOTOR_VERSION)."
+  }
+  ```
 
 ### Fase 1 — Verificar que el motor publicado es el correcto
 
@@ -176,9 +187,15 @@ Corresponde al paso 6 del [Checklist de release](#checklist-de-release). Es un *
 #### Paso 1 — Instalar y aprovisionar el motor publicado
 
 ```powershell
-# 1a. Instalar el motor con el instalador nativo por SO (Windows). Encadena
-#     setup automáticamente.
-irm https://raw.githubusercontent.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/main/install-windows.ps1 | iex
+# 1a. Instalar el motor con el instalador publicado en la release
+#     $MOTOR_VERSION (asset install.ps1 para Windows; install.sh es el de
+#     Linux/macOS). Encadena setup automáticamente. Antes de descargar,
+#     comprueba que el asset existe en esa release.
+$release = gh release view $MOTOR_VERSION --repo CristianRojas-SoftwareEngineer/AI-Voice-InterConnector --json assets | ConvertFrom-Json
+if ('install.ps1' -notin @($release.assets.name)) {
+  throw "La release $MOTOR_VERSION no publica el asset install.ps1."
+}
+irm "https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/releases/download/$MOTOR_VERSION/install.ps1" | iex
 
 # 1b. Comprobación: el CLI reporta la versión correcta.
 ai-voice-interconnector version
@@ -186,27 +203,44 @@ ai-voice-interconnector version
 # 1c. Aprovisionar el modelo (idempotente; el instalador ya lo encadena).
 ai-voice-interconnector setup
 
-# 1d. Comprobación: doctor con status ok.
-ai-voice-interconnector doctor --json | ConvertFrom-Json | ForEach-Object { $_.status }
-#     Debe imprimir: ok
+# 1d. Comprobación: doctor sano = exit 0 con failed vacío. El reporte es un
+#     único objeto JSON y no tiene campo "status": un veredicto negativo sale
+#     con exit 1 y failed no vacío (mismo reporte).
+$doctor = ai-voice-interconnector doctor --json | ConvertFrom-Json
+$ok = ($LASTEXITCODE -eq 0 -and @($doctor.failed).Count -eq 0)
+$ok
+#     Debe imprimir: True
+if (-not $ok) { throw "doctor no está sano (failed: $($doctor.failed -join ', '))." }
 ```
 
 #### Paso 2 — Dejar el daemon en marcha
 
 ```powershell
 ai-voice-interconnector daemon start
-# Comprobación: el daemon queda running.
-ai-voice-interconnector daemon status --json | ConvertFrom-Json | ForEach-Object { $_.running }
+# Comprobación: el daemon queda running. La clave es la cadena "daemon"; no
+# existe el booleano "running". Nota: daemon status termina SIEMPRE con exit 0
+# (también con "stopped" o "degraded"), así que "stopped" con exit 0 es un
+# estado válido, no un error.
+ai-voice-interconnector daemon status --json | ConvertFrom-Json | ForEach-Object { $_.daemon -eq "running" }
 #     Debe imprimir: True
 ```
 
 #### Paso 3 — Clonar el plugin en un directorio limpio
 
-No uses el árbol de desarrollo para el E2E: clona una copia fresca.
+No uses el árbol de desarrollo para el E2E: clona una copia fresca. Este smoke
+se ejecuta **antes de publicar** el release del plugin, así que el clon sale de
+la **ruta local** del repositorio de desarrollo (`$PLUGIN_DEV`): en ese momento
+los cambios **aún no están en GitHub** y un clon remoto no los contendría. El
+clon desde GitHub
+(`git clone https://github.com/CristianRojas-SoftwareEngineer/tts-sidecar-narrator`)
+corresponde al smoke de una **release ya publicada**, no a éste.
 
 ```powershell
 if (-not (Test-Path $PLUGIN_E2E)) {
-  git clone https://github.com/CristianRojas-SoftwareEngineer/tts-sidecar-narrator $PLUGIN_E2E
+  # Smoke previo a publicar: clon local, porque los cambios aún no están en GitHub.
+  # Para el smoke de una release ya publicada, clona en su lugar desde GitHub:
+  #   git clone https://github.com/CristianRojas-SoftwareEngineer/tts-sidecar-narrator $PLUGIN_E2E
+  git clone "$PLUGIN_DEV" $PLUGIN_E2E
 }
 # Comprobación: el dist/ compilado existe (es lo que ejecutan los hooks).
 Test-Path "$PLUGIN_E2E\dist\narrate-ctl.js"
@@ -220,7 +254,8 @@ Valida el pipeline TTS + daemon de forma aislada. No requiere claves.
 narrate-ctl on                        # activa la narración
 narrate-ctl mode local                # modo local (determinista, offline)
 narrate-ctl status                    # enabled: true, messageMode: local
-ai-voice-interconnector daemon status --json | ConvertFrom-Json | ForEach-Object { $_.running }
+# La clave es la cadena "daemon"; "stopped" con exit 0 no es error (ver paso 2).
+ai-voice-interconnector daemon status --json | ConvertFrom-Json | ForEach-Object { $_.daemon -eq "running" }
 narrate-ctl say "Prueba de audio local"
 # Comprobación AUDIBLE: se escucha la frase en español.
 ```
@@ -332,8 +367,11 @@ Pop-Location
 # 5. Verificar referencias cruzadas con el motor.
 Select-String -Path "$PLUGIN_DEV\README.md","$PLUGIN_DEV\docs\INTEGRATION.md" `
   -Pattern $MOTOR_VERSION
-# Lado del motor (si está clonado):
-#   Get-Content "$ENGINE_ROOT\docs\CLAUDE-CODE-INTEGRATION.md" -Tail 40
+# Lado del motor (si está clonado en $ENGINE_ROOT con checkout del tag $MOTOR_VERSION):
+#   Select-String -Path "$ENGINE_ROOT\docs\CLI\CONTRACT.md" -Pattern '^## 12\.' -Context 0,50
+#   (§12 Contratos externos — sección El integrador de narración: la tabla de
+#   superficies del motor que consume el plugin; en GitHub, la misma sección vive en
+#   https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/$MOTOR_VERSION/docs/CLI/CONTRACT.md#12-contratos-externos)
 
 # 6. Commit, tag y push.
 Push-Location $PLUGIN_DEV
