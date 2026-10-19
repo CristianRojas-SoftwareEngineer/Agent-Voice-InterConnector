@@ -64,7 +64,10 @@ async function main(): Promise<void> {
 
   // doctor --json imprime el reporte también en el veredicto negativo (exit 1)
   // y en el fallo del comando (doctor_failed); el veredicto sale del exit más
-  // el reporte parseado, nunca de un campo status.
+  // el reporte parseado, nunca de un campo status. Presupuesto de SessionStart
+  // (timeout 30 s en hooks/hooks.json): doctor ≤20 s + daemon status ≤5 s = 25 s
+  // de subprocesses, dejando ≥5 s de margen para arrancar Node, drenar stdin y
+  // resolver el CLI.
   const res = runCli(cli, ["doctor", "--json"], {
     encoding: "utf8",
     timeout: 20000,

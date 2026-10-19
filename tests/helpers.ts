@@ -47,9 +47,10 @@ export function makeTempDir(prefix = "narrator-test-"): string {
 }
 
 export function removeDir(dir: string): void {
-  // maxRetries: en Windows, un hijo desanclado recién creado (daemon start) puede
-  // retener handles del temporal unos milisegundos y rmSync lanza EPERM.
-  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  // maxRetries: en Windows, un hijo desanclado o un nieto sobreviviente de un
+  // spawnSync con timeout (p. ej. el shim que demora en doctor) puede retener
+  // handles del temporal y rmSync lanza EPERM mientras termina.
+  rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 150 });
 }
 
 /**

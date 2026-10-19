@@ -50,7 +50,9 @@ export function getDaemonStatus(cliPath: string): DaemonStatusResult {
   try {
     const res = runCli(cliPath, ["daemon", "status", "--json"], {
       encoding: "utf8",
-      timeout: 10000,
+      // Presupuesto de SessionStart: doctor ≤20 s + status ≤5 s = 25 s de
+      // subprocesses con ≥5 s de margen bajo el timeout de 30 s del hook.
+      timeout: 5000,
       windowsHide: true,
     });
     stdout = res.stdout;

@@ -47,6 +47,7 @@ function healthEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
 type ShimOptions = {
   doctorJson: string;
   doctorExit?: number;
+  doctorDelayMs?: number;
   daemonJson?: string;
   daemonExit?: number;
 };
@@ -54,16 +55,23 @@ type ShimOptions = {
 /**
  * Crea un `ai-voice-interconnector` falso en `dir` (shim .cmd en Windows, script
  * sh en Unix, ambos delegando en un impl Node). Despacha por argv: `doctor
- * --json` imprime `doctorJson` y sale con `doctorExit` (default 0);
- * `daemon status --json` imprime `daemonJson` y sale con `daemonExit` (default
- * 0); `daemon start` se registra y sale 0. Toda invocación anota su argv en
- * `argv.log`.
+ * --json` duerme `doctorDelayMs` (default 0) y luego imprime `doctorJson` y sale
+ * con `doctorExit` (default 0); `daemon status --json` imprime `daemonJson` y
+ * sale con `daemonExit` (default 0); `daemon start` se registra y sale 0. Toda
+ * invocación anota su argv en `argv.log`.
  */
 function makeFakeCli(dir: string, opts: ShimOptions): { argvLog: string } {
-  const { doctorJson, doctorExit = 0, daemonJson, daemonExit = 0 } = opts;
+  const {
+    doctorJson,
+    doctorExit = 0,
+    doctorDelayMs = 0,
+    daemonJson,
+    daemonExit = 0,
+  } = opts;
   const argvLog = join(dir, "argv.log");
   writeFileSync(join(dir, "doctor.json"), doctorJson);
   writeFileSync(join(dir, "doctor.exit"), String(doctorExit));
+  writeFileSync(join(dir, "doctor.delay"), String(doctorDelayMs));
   writeFileSync(
     join(dir, "daemon.json"),
     daemonJson ?? JSON.stringify({ schema_version: "5", daemon: "running" }),
@@ -77,6 +85,11 @@ function makeFakeCli(dir: string, opts: ShimOptions): { argvLog: string } {
       "const argv = process.argv.slice(2);",
       'fs.appendFileSync(path.join(__dirname, "argv.log"), JSON.stringify(argv) + "\\n");',
       'if (argv[0] === "doctor") {',
+      "  const delay = Number(fs.readFileSync(path.join(__dirname, \"doctor.delay\"), \"utf8\"));",
+      "  if (delay > 0) {",
+      "    const sab = new Int32Array(new SharedArrayBuffer(4));",
+      "    Atomics.wait(sab, 0, 0, delay);",
+      "  }",
       '  process.stdout.write(fs.readFileSync(path.join(__dirname, "doctor.json"), "utf8"));',
       '  process.exit(Number(fs.readFileSync(path.join(__dirname, "doctor.exit"), "utf8")));',
       "}",
@@ -387,3 +400,27 @@ test("sin CLI en el PATH: aviso de CLI ausente y exit 0", () => {
   assert.match(res.stdout, /systemMessage/);
   assert.match(res.stdout, /AI-Voice-InterConnector/);
 });
+
+test("presupuesto: un doctor que supera su timeout no compromete el hook (<30 s)", () => {
+  const dir = makeTempDir("narrator-health-cli-");
+  try {
+    // Demora por encima del timeout de doctor (20 s): el hook debe matarlo y
+    // terminar bien dentro del timeout de 30 s de SessionStart.
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: healthyDoctorJson(),
+      doctorDelayMs: 21000,
+    });
+    const start = Date.now();
+    const res = runHealth(dir);
+    const elapsed = Date.now() - start;
+    assert.equal(res.status, 0);
+    assert.ok(
+      elapsed >= 19000,
+      `la demora no se aplicó: el hook tardó ${elapsed} ms`,
+    );
+    assert.ok(elapsed < 30000, `el hook excedió el presupuesto: ${elapsed} ms`);
+    assert.ok(!invoked(argvLog, ["daemon", "status", "--json"]));
+  } finally {
+    removeDir(dir);
+  }
+}, { timeout: 60000 });
