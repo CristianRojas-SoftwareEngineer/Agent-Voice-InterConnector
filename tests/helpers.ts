@@ -50,7 +50,12 @@ export function removeDir(dir: string): void {
   // maxRetries: en Windows, un hijo desanclado o un nieto sobreviviente de un
   // spawnSync con timeout (p. ej. el shim que demora en doctor) puede retener
   // handles del temporal y rmSync lanza EPERM mientras termina.
-  rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 150 });
+  rmSync(dir, {
+    recursive: true,
+    force: true,
+    maxRetries: 20,
+    retryDelay: 150,
+  });
 }
 
 /**

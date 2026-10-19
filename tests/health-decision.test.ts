@@ -71,11 +71,19 @@ test("exit 1 + models_provisioned fallido ⇒ notify con setup y los modelos mis
 test("exit 1 + varios checks fallidos ⇒ un solo aviso que no oculta ninguno", () => {
   const decision = decideHealthAction({
     exitCode: 1,
-    report: failingReport(["install_receipt", "pending_artifacts", "path_resolves"]),
+    report: failingReport([
+      "install_receipt",
+      "pending_artifacts",
+      "path_resolves",
+    ]),
   });
   assert.equal(decision.kind, "notify");
   const message = decision.kind === "notify" ? decision.message : "";
-  for (const name of ["install_receipt", "pending_artifacts", "path_resolves"]) {
+  for (const name of [
+    "install_receipt",
+    "pending_artifacts",
+    "path_resolves",
+  ]) {
     assert.ok(message.includes(name), `el aviso debe nombrar ${name}`);
   }
   assert.match(message, /doctor --json/);
@@ -147,10 +155,7 @@ for (const [name, input] of uncertainCases) {
 
 test("parseFirstJsonObject: objeto único válido ⇒ lo devuelve", () => {
   const report = healthyReport();
-  assert.deepEqual(
-    parseFirstJsonObject(JSON.stringify(report)),
-    report,
-  );
+  assert.deepEqual(parseFirstJsonObject(JSON.stringify(report)), report);
 });
 
 test("parseFirstJsonObject: objeto único con espacios finales ⇒ lo devuelve", () => {
@@ -170,7 +175,10 @@ test("parseFirstJsonObject: dos objetos concatenados ⇒ undefined (salida invá
 });
 
 test("parseFirstJsonObject: contenido tras el cierre del objeto ⇒ undefined", () => {
-  assert.equal(parseFirstJsonObject(JSON.stringify(healthyReport()) + " basura"), undefined);
+  assert.equal(
+    parseFirstJsonObject(JSON.stringify(healthyReport()) + " basura"),
+    undefined,
+  );
 });
 
 test("parseFirstJsonObject: texto sin objeto ⇒ undefined", () => {

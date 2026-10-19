@@ -134,7 +134,7 @@ function normalizeDegraded(value) {
 function getDaemonStatus(cliPath) {
   let stdout;
   let spawnError;
-  let status = null;
+  let status;
   try {
     const res = runCli(cliPath, ["daemon", "status", "--json"], {
       encoding: "utf8",
@@ -256,7 +256,9 @@ function buildFailedMessage(report) {
   const parts = report.failed.map((name) => {
     const check = report.checks.find((c) => c.name === name);
     if (name === "models_provisioned") {
-      const missing = Array.isArray(report.models?.missing) ? report.models.missing.filter((m) => typeof m === "string") : [];
+      const missing = Array.isArray(report.models?.missing) ? report.models.missing.filter(
+        (m) => typeof m === "string"
+      ) : [];
       const missingNote = missing.length > 0 ? ` Modelos sin provisionar: ${missing.join(", ")}.` : "";
       return `${name}: ${NOT_PROVISIONED_MESSAGE}${missingNote}`;
     }

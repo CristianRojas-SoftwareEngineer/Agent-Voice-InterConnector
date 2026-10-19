@@ -25,9 +25,7 @@ function normalizeWarm(value: unknown): DaemonStatusResult["warm"] {
     : undefined;
 }
 
-function normalizeDegraded(
-  value: unknown,
-): DaemonStatusResult["degraded"] {
+function normalizeDegraded(value: unknown): DaemonStatusResult["degraded"] {
   return value === "unresponsive" ||
     value === "unregistered" ||
     value === "orphan_resident"
@@ -46,7 +44,7 @@ function normalizeDegraded(
 export function getDaemonStatus(cliPath: string): DaemonStatusResult {
   let stdout: string | Buffer | undefined;
   let spawnError: unknown;
-  let status: number | null = null;
+  let status: number | null;
   try {
     const res = runCli(cliPath, ["daemon", "status", "--json"], {
       encoding: "utf8",
@@ -93,27 +91,6 @@ export function getDaemonStatus(cliPath: string): DaemonStatusResult {
     return { kind: "degraded", exitCode, degraded, raw: parsed };
   }
   return { kind: "stopped", exitCode, raw: parsed };
-}
-
-/**
- * ¿El daemon está en ejecución? Consulta síncrona y barata (`daemon status
- * --json`), sin cargar el modelo. Devuelve false ante cualquier fallo o duda.
- */
-export function isDaemonRunning(cliPath: string): boolean {
-  try {
-    const res = runCli(cliPath, ["daemon", "status", "--json"], {
-      encoding: "utf8",
-      timeout: 10000,
-      windowsHide: true,
-    });
-    if (res.error || typeof res.stdout !== "string" || !res.stdout.trim()) {
-      return false;
-    }
-    const status = JSON.parse(res.stdout) as { daemon?: unknown };
-    return status.daemon === "running";
-  } catch {
-    return false;
-  }
 }
 
 /**

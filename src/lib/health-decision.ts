@@ -137,7 +137,9 @@ function buildFailedMessage(report: DoctorReport): string {
     const check = report.checks.find((c) => c.name === name);
     if (name === "models_provisioned") {
       const missing = Array.isArray(report.models?.missing)
-        ? report.models.missing.filter((m): m is string => typeof m === "string")
+        ? report.models.missing.filter(
+            (m): m is string => typeof m === "string",
+          )
         : [];
       const missingNote =
         missing.length > 0
