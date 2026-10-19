@@ -5,11 +5,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 // Hook de SessionStart (dist/health-check.js) como subproceso real, con un CLI
-// `ai-voice-interconnector` falso en el PATH que responde a `doctor --json`,
-// `daemon status --json` y `daemon start`. Fija por contrato el veredicto sobre
-// el esquema plano {status, issues[]}: calentar el daemon solo con status "ok",
-// avisar al usuario con status "failed", y descartar con seguridad el segundo
-// objeto JSON que el motor concatena al reporte cuando falla.
+// `ai-voice-interconnector` falso en el PATH parametrizado por caso: `doctor
+// --json` con su exit y payload (contrato v0.34.0: reporte con failed/checks o
+// objeto de error), y `daemon status --json` con su exit y payload (running/
+// stopped/degraded o basura). Fija por contrato el flujo nuevo: consultar el
+// daemon solo tras diagnóstico sano, arrancarlo a lo sumo una vez y solo con
+// stopped limpio, aviso por systemMessage ante negativo/degraded/incierto, y
+// exit 0 en todos los caminos.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -41,17 +43,32 @@ function healthEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   return env;
 }
 
+/** Salidas del CLI falso por invocación. */
+type ShimOptions = {
+  doctorJson: string;
+  doctorExit?: number;
+  daemonJson?: string;
+  daemonExit?: number;
+};
+
 /**
  * Crea un `ai-voice-interconnector` falso en `dir` (shim .cmd en Windows, script
  * sh en Unix, ambos delegando en un impl Node). Despacha por argv: `doctor
- * --json` imprime `doctorJson`; `daemon status --json` imprime
- * {"daemon":"running"} (daemon ya en marcha, forma real del motor), de modo que
- * el hook no arranca el nieto desanclado; cualquier invocación anota su argv en
+ * --json` imprime `doctorJson` y sale con `doctorExit` (default 0);
+ * `daemon status --json` imprime `daemonJson` y sale con `daemonExit` (default
+ * 0); `daemon start` se registra y sale 0. Toda invocación anota su argv en
  * `argv.log`.
  */
-function makeFakeCli(dir: string, doctorJson: string): { argvLog: string } {
+function makeFakeCli(dir: string, opts: ShimOptions): { argvLog: string } {
+  const { doctorJson, doctorExit = 0, daemonJson, daemonExit = 0 } = opts;
   const argvLog = join(dir, "argv.log");
   writeFileSync(join(dir, "doctor.json"), doctorJson);
+  writeFileSync(join(dir, "doctor.exit"), String(doctorExit));
+  writeFileSync(
+    join(dir, "daemon.json"),
+    daemonJson ?? JSON.stringify({ schema_version: "5", daemon: "running" }),
+  );
+  writeFileSync(join(dir, "daemon.exit"), String(daemonExit));
   writeFileSync(
     join(dir, "impl.cjs"),
     [
@@ -61,11 +78,11 @@ function makeFakeCli(dir: string, doctorJson: string): { argvLog: string } {
       'fs.appendFileSync(path.join(__dirname, "argv.log"), JSON.stringify(argv) + "\\n");',
       'if (argv[0] === "doctor") {',
       '  process.stdout.write(fs.readFileSync(path.join(__dirname, "doctor.json"), "utf8"));',
-      "  process.exit(0);",
+      '  process.exit(Number(fs.readFileSync(path.join(__dirname, "doctor.exit"), "utf8")));',
       "}",
       'if (argv[0] === "daemon" && argv[1] === "status") {',
-      '  process.stdout.write(JSON.stringify({ daemon: "running" }));',
-      "  process.exit(0);",
+      '  process.stdout.write(fs.readFileSync(path.join(__dirname, "daemon.json"), "utf8"));',
+      '  process.exit(Number(fs.readFileSync(path.join(__dirname, "daemon.exit"), "utf8")));',
       "}",
       "process.exit(0);",
     ].join("\n"),
@@ -93,13 +110,20 @@ function fakeCliEnv(dir: string): Record<string, string> {
   return { PATH: p, Path: p };
 }
 
-function runHealth(cliDir: string): {
+/** PATH sin `ai-voice-interconnector` (solo el dir del binario de Node). */
+function nodeOnlyEnv(): Record<string, string> {
+  const p = dirname(process.execPath);
+  return { PATH: p, Path: p };
+}
+
+function runHealth(cliDir: string | null): {
   status: number | null;
   stdout: string;
   stderr: string;
 } {
+  const env = healthEnv(cliDir ? fakeCliEnv(cliDir) : nodeOnlyEnv());
   const res = spawnSync(process.execPath, [HEALTH], {
-    env: healthEnv(fakeCliEnv(cliDir)),
+    env,
     input: "",
     encoding: "utf8",
     windowsHide: true,
@@ -121,71 +145,243 @@ function invoked(argvLog: string, prefix: string[]): boolean {
   );
 }
 
-test("status ok: no avisa y consulta el daemon para calentarlo", () => {
+function startCount(argvLog: string): number {
+  return loggedArgvs(argvLog).filter(
+    (argv) => argv[0] === "daemon" && argv[1] === "start",
+  ).length;
+}
+
+/** Reporte sano del contrato v0.34.0: failed vacío y checks correctos. */
+function healthyDoctorJson(): string {
+  return JSON.stringify({
+    schema_version: "5",
+    version: "0.34.0",
+    failed: [],
+    checks: [{ name: "install_receipt", ok: true, detail: "recibo válido" }],
+    models: { missing: [] },
+  });
+}
+
+test("sano + daemon running: no avisa, consulta el estado y no arranca", () => {
   const dir = makeTempDir("narrator-health-cli-");
   try {
-    const { argvLog } = makeFakeCli(
-      dir,
-      JSON.stringify({
-        status: "ok",
-        data_dir: "/x",
-        hf_cache: "/y",
-        base_status: "ready",
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: healthyDoctorJson(),
+      daemonJson: JSON.stringify({
+        schema_version: "5",
+        daemon: "running",
+        warm: "warm",
       }),
-    );
+    });
     const res = runHealth(dir);
     assert.equal(res.status, 0);
-    // status "ok": ningún aviso al usuario.
     assert.ok(!res.stdout.includes("systemMessage"));
-    // Alcanzó la rama de calentado: consultó el estado del daemon.
     assert.ok(invoked(argvLog, ["doctor", "--json"]));
     assert.ok(invoked(argvLog, ["daemon", "status", "--json"]));
-    // El daemon ya está en marcha: el hook no debe arrancarlo (sin nieto).
-    assert.ok(!invoked(argvLog, ["daemon", "start"]));
+    assert.equal(startCount(argvLog), 0);
   } finally {
     removeDir(dir);
   }
 });
 
-test("status failed: avisa al usuario y no consulta el daemon", () => {
+test("sano + daemon stopped limpio: arranca el daemon exactamente una vez", () => {
   const dir = makeTempDir("narrator-health-cli-");
   try {
-    const { argvLog } = makeFakeCli(
-      dir,
-      JSON.stringify({
-        status: "failed",
-        issues: ["Qwen3-TTS model no provisionado"],
-      }),
-    );
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: healthyDoctorJson(),
+      daemonJson: JSON.stringify({ schema_version: "5", daemon: "stopped" }),
+    });
     const res = runHealth(dir);
     assert.equal(res.status, 0);
-    // status "failed": aviso al usuario remitiendo a la provisión del motor.
+    assert.ok(!res.stdout.includes("systemMessage"));
+    assert.ok(invoked(argvLog, ["daemon", "status", "--json"]));
+    assert.equal(startCount(argvLog), 1);
+  } finally {
+    removeDir(dir);
+  }
+});
+
+test("sano + daemon stopped degraded: avisa remitiendo a daemon status y no arranca", () => {
+  const dir = makeTempDir("narrator-health-cli-");
+  try {
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: healthyDoctorJson(),
+      daemonJson: JSON.stringify({
+        schema_version: "5",
+        daemon: "stopped",
+        degraded: "unresponsive",
+      }),
+    });
+    const res = runHealth(dir);
+    assert.equal(res.status, 0);
     assert.match(res.stdout, /systemMessage/);
+    assert.match(res.stdout, /daemon status/);
+    assert.equal(startCount(argvLog), 0);
+  } finally {
+    removeDir(dir);
+  }
+});
+
+test("sano + daemon running warm_failed: avisa del fallo de calentamiento y no arranca", () => {
+  const dir = makeTempDir("narrator-health-cli-");
+  try {
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: healthyDoctorJson(),
+      daemonJson: JSON.stringify({
+        schema_version: "5",
+        daemon: "running",
+        warm: "warm_failed",
+      }),
+    });
+    const res = runHealth(dir);
+    assert.equal(res.status, 0);
+    assert.match(res.stdout, /systemMessage/);
+    assert.equal(startCount(argvLog), 0);
+  } finally {
+    removeDir(dir);
+  }
+});
+
+test("sano + daemon running warming: no avisa ni bloquea ni arranca", () => {
+  const dir = makeTempDir("narrator-health-cli-");
+  try {
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: healthyDoctorJson(),
+      daemonJson: JSON.stringify({
+        schema_version: "5",
+        daemon: "running",
+        warm: "warming",
+      }),
+    });
+    const res = runHealth(dir);
+    assert.equal(res.status, 0);
+    assert.ok(!res.stdout.includes("systemMessage"));
+    assert.equal(startCount(argvLog), 0);
+  } finally {
+    removeDir(dir);
+  }
+});
+
+test("sano + daemon status ilegible: avisa remitiendo a daemon status y no arranca", () => {
+  const dir = makeTempDir("narrator-health-cli-");
+  try {
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: healthyDoctorJson(),
+      daemonJson: "esto no es json",
+    });
+    const res = runHealth(dir);
+    assert.equal(res.status, 0);
+    assert.match(res.stdout, /systemMessage/);
+    assert.match(res.stdout, /daemon status/);
+    assert.equal(startCount(argvLog), 0);
+  } finally {
+    removeDir(dir);
+  }
+});
+
+test("doctor exit 1 + failed no vacío: avisa nombrando todos los checks, sin consultar el daemon", () => {
+  const dir = makeTempDir("narrator-health-cli-");
+  try {
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: JSON.stringify({
+        schema_version: "5",
+        failed: ["models_provisioned", "install_receipt"],
+        checks: [
+          {
+            name: "models_provisioned",
+            ok: false,
+            detail: "faltan modelos",
+          },
+          {
+            name: "install_receipt",
+            ok: false,
+            detail: "recibo ilegible",
+          },
+        ],
+        models: { missing: ["qwen3-tts-0.6b-base"] },
+      }),
+      doctorExit: 1,
+    });
+    const res = runHealth(dir);
+    assert.equal(res.status, 0);
+    assert.match(res.stdout, /systemMessage/);
+    assert.match(res.stdout, /models_provisioned/);
+    assert.match(res.stdout, /install_receipt/);
     assert.match(res.stdout, /ai-voice-interconnector setup/);
-    // El aviso corta antes de la rama de calentado: no consulta el daemon.
     assert.ok(invoked(argvLog, ["doctor", "--json"]));
     assert.ok(!invoked(argvLog, ["daemon", "status", "--json"]));
+    assert.equal(startCount(argvLog), 0);
   } finally {
     removeDir(dir);
   }
 });
 
-test("doble objeto JSON: parsea el primero (reporte) e ignora el {error} concatenado", () => {
+test("doctor exit 1 + objeto de error doctor_failed: aviso de fallo del diagnóstico, sin consultar el daemon", () => {
   const dir = makeTempDir("narrator-health-cli-");
   try {
-    // El motor concatena el reporte y un {error,…} cuando falla; un JSON.parse
-    // del total rompería. El aviso confirma que se tomó solo el primer objeto.
-    const doctorJson =
-      JSON.stringify({ status: "failed", issues: ["modelo ausente"] }) +
-      "\n" +
-      JSON.stringify({ error: { code: 4, message: "provisión incompleta" } });
-    const { argvLog } = makeFakeCli(dir, doctorJson);
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: JSON.stringify({
+        schema_version: "5",
+        error: "no se pudo resolver el ejecutable en ejecución",
+        reason: "doctor_failed",
+        message: "doctor falló",
+      }),
+      doctorExit: 1,
+    });
     const res = runHealth(dir);
     assert.equal(res.status, 0);
     assert.match(res.stdout, /systemMessage/);
-    assert.match(res.stdout, /ai-voice-interconnector setup/);
-    assert.ok(invoked(argvLog, ["doctor", "--json"]));
+    assert.ok(!res.stdout.includes("setup"));
+    assert.ok(!invoked(argvLog, ["daemon", "status", "--json"]));
+    assert.equal(startCount(argvLog), 0);
   } finally {
     removeDir(dir);
   }
+});
+
+test("doctor exit 0 + JSON ilegible: sin aviso ni daemon (estado incierto)", () => {
+  const dir = makeTempDir("narrator-health-cli-");
+  try {
+    const { argvLog } = makeFakeCli(dir, { doctorJson: "esto no es json" });
+    const res = runHealth(dir);
+    assert.equal(res.status, 0);
+    assert.ok(!res.stdout.includes("systemMessage"));
+    assert.ok(!invoked(argvLog, ["daemon", "status", "--json"]));
+    assert.equal(startCount(argvLog), 0);
+  } finally {
+    removeDir(dir);
+  }
+});
+
+test("doctor exit 0 con failed no vacío (incoherente): sin daemon ni arranque", () => {
+  const dir = makeTempDir("narrator-health-cli-");
+  try {
+    const { argvLog } = makeFakeCli(dir, {
+      doctorJson: JSON.stringify({
+        schema_version: "5",
+        failed: ["models_provisioned"],
+        checks: [
+          {
+            name: "models_provisioned",
+            ok: false,
+            detail: "faltan modelos",
+          },
+        ],
+        models: { missing: [] },
+      }),
+    });
+    const res = runHealth(dir);
+    assert.equal(res.status, 0);
+    assert.ok(!invoked(argvLog, ["daemon", "status", "--json"]));
+    assert.equal(startCount(argvLog), 0);
+  } finally {
+    removeDir(dir);
+  }
+});
+
+test("sin CLI en el PATH: aviso de CLI ausente y exit 0", () => {
+  const res = runHealth(null);
+  assert.equal(res.status, 0);
+  assert.match(res.stdout, /systemMessage/);
+  assert.match(res.stdout, /AI-Voice-InterConnector/);
 });
