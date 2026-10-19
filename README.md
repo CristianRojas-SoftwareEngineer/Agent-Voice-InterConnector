@@ -35,7 +35,8 @@ Plugin de [Claude Code](https://code.claude.com) que **narra por voz** la activi
    ai-voice-interconnector setup
    ```
    El plugin lo verifica al iniciar la sesión (`SessionStart`) y te avisa si
-   falta el CLI o el modelo. El plugin **no** instala AI-Voice-InterConnector.
+   falta el CLI o el modelo. El plugin **no** instala AI-Voice-InterConnector;
+   está verificado contra AI-Voice-InterConnector `v0.34.0`.
 2. _(Opcional)_ **API keys gratuitas** para mensajes generados por LLM:
    - [Gemini API](https://ai.google.dev/) (free tier) — principal.
    - [OpenRouter](https://openrouter.ai/) (modelos `:free`) — fallback.
@@ -133,7 +134,7 @@ El CI (CircleCI, [.circleci/config.yml](.circleci/config.yml)) corre `typecheck`
   AI-Voice-InterConnector desde la perspectiva del plugin: contrato del CLI, uso por cada
   hook, requisitos y degradación. Su contraparte, desde la perspectiva del
   motor, está en
-  [AI-Voice-InterConnector/docs/CLAUDE-CODE-INTEGRATION.md](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/docs/CLAUDE-CODE-INTEGRATION.md).
+  [AI-Voice-InterConnector/docs/CLI/CONTRACT.md §12](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/v0.34.0/docs/CLI/CONTRACT.md#12-contratos-externos).
 - [`docs/RELEASING.md`](docs/RELEASING.md) — proceso de release del plugin y
   su sincronización con los releases del motor.
 - [`SECURITY.md`](SECURITY.md) — política de seguridad y modelo de amenaza del

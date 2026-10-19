@@ -5,9 +5,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 // Resuelve el ejecutable `ai-voice-interconnector` recorriendo el PATH, con las
-// extensiones adecuadas por SO. Los instaladores nativos por SO
-// (install-windows.ps1, install-linux.sh, install-macos.sh) dejan el CLI en el
-// PATH en los tres SO.
+// extensiones adecuadas por SO. Los instaladores nativos (install.ps1 en
+// Windows, install.sh en Linux y macOS) dejan el CLI en el PATH en los tres SO.
 import {
   spawn,
   spawnSync,
