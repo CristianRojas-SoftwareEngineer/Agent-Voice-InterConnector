@@ -29,36 +29,39 @@ Eres el asistente que guía al usuario para dejar operativo el plugin `tts-sidec
 1. Comprueba si el CLI ya está en el PATH:
    - Linux/macOS: `command -v ai-voice-interconnector`
    - Windows: `where ai-voice-interconnector` (o `Get-Command ai-voice-interconnector`)
-2. Si **está presente**, corre `ai-voice-interconnector doctor --json` y analiza el JSON
-   (campo `status`: `ok`/`failed`, y la lista `issues`). Con esto sabes qué falta realmente:
-   - Si `status` es `ok` → el motor ya está listo; salta al **Paso 3** (daemon) y
-     luego al **Paso 4** (pre-síntesis) y al **Paso 6** (verificación).
-   - Si `status` es `failed` → falta el modelo o el entorno; revisa `issues` y salta al **Paso 2**.
+2. Si **está presente**, corre `ai-voice-interconnector doctor --json` y analiza el JSON:
+   emite un solo objeto con `checks: {name, ok, detail}[]` y `failed: string[]` (los
+   names de los checks fallidos; vacío = sano). Con esto sabes qué falta realmente:
+   - **Exit `0`** con `failed` vacío → todos los checks pasan: el motor ya está listo;
+     salta al **Paso 3** (daemon) y luego al **Paso 4** (pre-síntesis) y al
+     **Paso 6** (verificación).
+   - **Exit `1`** con `failed` no vacío → falta algo; revisa `failed`/`checks` y
+     instala o ejecuta `setup` según el caso (normalmente salta al **Paso 2**; si el
+     propio binario está dañado, al **Paso 1**). Este fallo imprime el MISMO reporte,
+     sin objeto de error detrás.
+   - **Exit `1`** con un objeto `reason: "doctor_failed"` → falló el comando doctor
+     (no el veredicto): re-ejecútalo antes de continuar.
 3. Si **no está presente**, continúa al **Paso 1**.
 
 Resume al usuario en una frase qué encontraste y qué vas a hacer.
 
 ## Paso 1 — Instalar el binario AI-Voice-InterConnector (instalador nativo por SO)
 
-Usa el instalador nativo que corresponde al SO. Cada uno descarga el binario, lo
-agrega al PATH del usuario (sin `sudo`) y encadena `setup` automáticamente:
+Usa el instalador nativo que corresponde al SO. La release `v0.34.0` publica dos
+assets: `install.sh` (Linux y macOS) e `install.ps1` (Windows). Cada uno descarga
+el binario, lo agrega al PATH del usuario (sin `sudo`) y encadena `setup`
+automáticamente:
 
-- **Linux**:
-
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/main/install-linux.sh | sh
-  ```
-
-- **macOS**:
+- **Linux** y **macOS**:
 
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/main/install-macos.sh | sh
+  curl -fsSL https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/releases/download/v0.34.0/install.sh | sh
   ```
 
 - **Windows** (PowerShell):
 
   ```powershell
-  irm https://raw.githubusercontent.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/main/install-windows.ps1 | iex
+  irm https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/releases/download/v0.34.0/install.ps1 | iex
   ```
 
 Tras instalar por cualquier vía, **verifica**: `ai-voice-interconnector version`. Si el comando no se encuentra, probablemente el PATH aún no se recargó: indica al usuario abrir una terminal nueva (o reiniciar Claude Code) y reanuda.
@@ -69,12 +72,20 @@ Tras instalar por cualquier vía, **verifica**: `ai-voice-interconnector version
 ai-voice-interconnector setup
 ```
 
-Corre los chequeos de `doctor` y descarga el modelo `qwen3-tts-0.6b` a la caché de HuggingFace **solo si falta** (idempotente; el instalador del Paso 1 ya lo encadena, así que normalmente esto solo confirma el estado). Advertencias a comunicar:
+`setup` provisiona la selección de **cinco modelos** (idempotente; el instalador del
+Paso 1 ya lo encadena, así que normalmente esto solo confirma el estado):
 
-- La descarga es **grande** (varios cientos de MB) y puede tardar.
-- El modelo puede estar **gated** en HuggingFace: si `setup` reporta un problema
-  de autorización, guía al usuario a aceptar las condiciones del modelo en su
-  cuenta de HuggingFace (o definir `HF_TOKEN`) y reintentar.
+- `qwen3-tts-0.6b` (CustomVoice) y `qwen3-tts-0.6b-base` (Base): el modelo **Base es
+  requerido por las voces clonadas**, incluida la voz de fábrica `default`.
+- `opus-mt-es-en` y `opus-mt-en-es` (traducción) y `parakeet-tdt-v3` (STT).
+
+Advertencias a comunicar:
+
+- Las descargas son **grandes** (varios cientos de MB) y pueden tardar.
+- El acceso **gated** de HuggingFace puede afectar a **algunos** modelos, no a todos:
+  si `setup` reporta un problema de autorización, guía al usuario a aceptar las
+  condiciones del modelo afectado en su cuenta de HuggingFace (o definir `HF_TOKEN`)
+  y reintentar. No atribuyas todo fallo de descarga a HuggingFace gated.
 
 ## Paso 3 — Dejar el daemon en marcha
 
@@ -97,12 +108,20 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" presynth
 
 Interpreta el resultado:
 
-- **Exit `0`** → todos los anuncios quedaron pre-sintetizados (los ya existentes se
-  reportan como «ya pre-sintetizado»: el comando es idempotente y es seguro repetirlo).
-- **Fallo con «daemon caído» (exit `5` del motor)** → vuelve al **Paso 3** y
-  reintenta.
-- **Fallo con «modelo ausente» (exit `4` del motor)** → vuelve al **Paso 2**
-  (`ai-voice-interconnector setup`) y reintenta.
+- **Exit `0`** → todos los anuncios quedaron pre-sintetizados. El exit `6`
+  (`label_exists`) de `speech synthesize` por una etiqueta ya existente cuenta como
+  **éxito** (idempotencia) y se reporta como «ya pre-sintetizado»: es seguro repetir
+  el comando.
+- **Exit final ≠ `0`** → algún anuncio falló. La salida imprime el código interno del
+  motor (`5`, `4`, …) como referencia del motor, **no como diagnóstico del plugin**:
+  un código de fallo por sí solo no demuestra que el sidecar esté corrupto.
+  - `5` (daemon caído) → vuelve al **Paso 3** y reintenta.
+  - `4` (modelo ausente) → vuelve al **Paso 2** (`ai-voice-interconnector setup`) y
+    reintenta.
+  - Si una locución concreta quedó dañada o desactualizada, elimina **solo esa**
+    etiqueta con `ai-voice-interconnector speech remove --label <etiqueta> [--voice <voz>]`
+    y re-ejecuta `presynth`. No uses `cleanup --all` ni `cleanup --synthetic-speech`
+    como primer remedio.
 
 ## Paso 5 — Activar la narración y, opcionalmente, el modo LLM
 
@@ -126,8 +145,8 @@ Interpreta el resultado:
 
 ## Paso 6 — Verificación de extremo a extremo
 
-1. Diagnóstico final: `ai-voice-interconnector doctor --json`. Confirma que `status`
-   es `ok` (la lista `issues` queda vacía).
+1. Diagnóstico final: `ai-voice-interconnector doctor --json`. Confirma exit `0` con
+   `failed: []` (todos los entries de `checks` con `ok: true`).
 2. Narración de prueba real (debe sonar audio):
 
    ```bash
@@ -155,4 +174,4 @@ Interpreta el resultado:
 
 Confirma al usuario, en pocas frases, que a partir de ahora **cada sesión de Claude Code narrará automáticamente**: el hook `SessionStart` verifica el entorno y levanta el daemon si hace falta; luego **cada evento registrado** (`UserPromptSubmit`, `Stop`, `SubagentStop`, `StopFailure` y `Notification`) genera y reproduce una locución corta. El daemon se relevanta solo en la primera sesión tras un reinicio (hook `SessionStart`), así que no hay mantenimiento manual. Recuérdale los controles a demanda de la skill `/tts-sidecar-narrator:narrate` (`on`/`off`/`mode`/`status`/`say`/`presynth`).
 
-Menciona también el mantenimiento de los anuncios pre-sintetizados: si se borra la caché del motor (`synthetic-speech/`), basta re-ejecutar `node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" presynth` con el daemon caliente (es idempotente; los anuncios vigentes no se re-sintetizan). Como los labels son slugs fijos, si en una actualización del plugin **cambia la frase** de un anuncio, `presynth` a secas no lo detecta (el label no cambió): hay que forzar la sobreescritura con `node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" presynth --force`.
+Menciona también el mantenimiento de los anuncios pre-sintetizados: si se borran las locuciones del almacén del motor (`<data_dir>/speech/<voz>/<etiqueta>.wav`), basta re-ejecutar `node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" presynth` con el daemon caliente (es idempotente; los anuncios vigentes no se re-sintetizan). Ten en cuenta que `--synthetic-speech` es una categoría de `cleanup`, no una carpeta. Como los labels son slugs fijos, si en una actualización del plugin **cambia la frase** de un anuncio, `presynth` a secas no lo detecta (el label no cambió): hay que forzar la sobreescritura con `node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" presynth --force`.
