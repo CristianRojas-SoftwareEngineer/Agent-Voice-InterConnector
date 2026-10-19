@@ -125,21 +125,57 @@ function readStdin() {
 }
 
 // src/lib/daemon.ts
-function isDaemonRunning(cliPath) {
+function normalizeWarm(value) {
+  return value === "warming" || value === "warm" || value === "warm_failed" ? value : void 0;
+}
+function normalizeDegraded(value) {
+  return value === "unresponsive" || value === "unregistered" || value === "orphan_resident" ? value : void 0;
+}
+function getDaemonStatus(cliPath) {
+  let stdout;
+  let spawnError;
+  let status = null;
   try {
     const res = runCli(cliPath, ["daemon", "status", "--json"], {
       encoding: "utf8",
       timeout: 1e4,
       windowsHide: true
     });
-    if (res.error || typeof res.stdout !== "string" || !res.stdout.trim()) {
-      return false;
-    }
-    const status = JSON.parse(res.stdout);
-    return status.daemon === "running";
+    stdout = res.stdout;
+    spawnError = res.error;
+    status = typeof res.status === "number" ? res.status : null;
   } catch {
-    return false;
+    return { kind: "incierto", exitCode: null };
   }
+  const exitCode = status;
+  if (spawnError || typeof stdout !== "string" || !stdout.trim()) {
+    return { kind: "incierto", exitCode };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    return { kind: "incierto", exitCode };
+  }
+  if (exitCode !== 0) {
+    return { kind: "incierto", exitCode, raw: parsed };
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return { kind: "incierto", exitCode, raw: parsed };
+  }
+  const record = parsed;
+  if (record.daemon !== "running" && record.daemon !== "stopped") {
+    return { kind: "incierto", exitCode, raw: parsed };
+  }
+  if (record.daemon === "running") {
+    const warm = normalizeWarm(record.warm);
+    return warm ? { kind: "running", exitCode, warm, raw: parsed } : { kind: "running", exitCode, raw: parsed };
+  }
+  const degraded = normalizeDegraded(record.degraded);
+  if (degraded) {
+    return { kind: "degraded", exitCode, degraded, raw: parsed };
+  }
+  return { kind: "stopped", exitCode, raw: parsed };
 }
 function startDaemonDetached(cliPath) {
   try {
@@ -252,6 +288,10 @@ function notify(message) {
 function ok() {
   process.exit(0);
 }
+function daemonStatusMessage(status) {
+  const reason = status.kind === "degraded" ? `el daemon reporta degraded (${status.degraded})` : "el estado del daemon es incierto";
+  return `tts-sidecar-narrator: ${reason}. Ejecuta ai-voice-interconnector daemon status --json para diagnosticarlo; el daemon no se arranc\xF3.`;
+}
 async function main() {
   await readStdin();
   const cfg = loadConfig();
@@ -268,11 +308,24 @@ async function main() {
     windowsHide: true
   });
   if (res.error || typeof res.stdout !== "string" || !res.stdout.trim()) ok();
+  const exitCode = typeof res.status === "number" ? res.status : null;
   const report = parseFirstJsonObject(res.stdout);
-  const daemonRunning = report?.status === "ok" ? isDaemonRunning(cli) : false;
-  const decision = decideHealthAction(report, daemonRunning);
+  const decision = decideHealthAction({ exitCode, report });
   if (decision.kind === "notify") notify(decision.message);
-  if (decision.kind === "warm") startDaemonDetached(cli);
-  ok();
+  if (decision.kind === "uncertain") ok();
+  const status = getDaemonStatus(cli);
+  if (status.kind === "running") {
+    if (status.warm === "warm_failed") {
+      notify(
+        "tts-sidecar-narrator: el daemon est\xE1 corriendo pero el calentamiento del modelo fall\xF3 (warm_failed); la primera narraci\xF3n puede tardar o fallar. Ejecuta ai-voice-interconnector daemon status --json para el detalle."
+      );
+    }
+    ok();
+  }
+  if (status.kind === "stopped") {
+    startDaemonDetached(cli);
+    ok();
+  }
+  notify(daemonStatusMessage(status));
 }
 main().catch(() => process.exit(0));

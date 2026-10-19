@@ -47,7 +47,27 @@ export function makeTempDir(prefix = "narrator-test-"): string {
 }
 
 export function removeDir(dir: string): void {
-  rmSync(dir, { recursive: true, force: true });
+  // maxRetries: en Windows, un hijo desanclado recién creado (daemon start) puede
+  // retener handles del temporal unos milisegundos y rmSync lanza EPERM.
+  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+}
+
+/**
+ * Espera a que un predicado sea verdadero, consultando cada 50 ms hasta el
+ * timeout. Devuelve el valor final del predicado. Sirve para observar efectos
+ * asíncronos de un hijo desanclado (p. ej. el append a argv.log de daemon
+ * start), que en Windows puede tardar cientos de milisegundos.
+ */
+export async function waitFor(
+  predicate: () => boolean,
+  timeoutMs = 3000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return predicate();
 }
 
 /**

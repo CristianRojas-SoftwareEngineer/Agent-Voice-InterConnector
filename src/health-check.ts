@@ -5,15 +5,21 @@
 // SPDX-License-Identifier: MPL-2.0
 
 // Hook de SessionStart: verifica una sola vez por sesión que la cadena de
-// narración está completa (CLI en PATH + modelo cacheado) y, si todo está listo,
-// deja el daemon en marcha para que speak --daemon esté caliente durante la
-// sesión (elimina el arranque manual tras un reinicio). Ante una carencia, avisa
-// al usuario con el campo systemMessage del JSON de salida (único mecanismo de
+// narración está completa (CLI en PATH + diagnóstico sano) y, solo en ese caso,
+// deja el daemon en marcha para que `speech say --daemon` esté caliente durante
+// la sesión (elimina el arranque manual tras un reinicio). El veredicto sale
+// del exit de `doctor --json` más su reporte (failed/checks, contrato v0.34.0);
+// ante un check fallido o un estado degradado/incierto del daemon avisa al
+// usuario con el campo systemMessage del JSON de salida (único mecanismo de
 // aviso portable). Nunca falla la sesión: exit 0 siempre.
 import { loadConfig } from "./lib/config.js";
 import { resolveCli, runCli } from "./lib/resolve-cli.js";
 import { readStdin } from "./lib/hook-payload.js";
-import { isDaemonRunning, startDaemonDetached } from "./lib/daemon.js";
+import {
+  getDaemonStatus,
+  startDaemonDetached,
+  type DaemonStatusResult,
+} from "./lib/daemon.js";
 import {
   parseFirstJsonObject,
   decideHealthAction,
@@ -27,6 +33,19 @@ function notify(message: string): never {
 
 function ok(): never {
   process.exit(0);
+}
+
+/** Aviso acotado ante degraded o estado incierto del daemon. */
+function daemonStatusMessage(status: DaemonStatusResult): string {
+  const reason =
+    status.kind === "degraded"
+      ? `el daemon reporta degraded (${status.degraded})`
+      : "el estado del daemon es incierto";
+  return (
+    `tts-sidecar-narrator: ${reason}. Ejecuta ` +
+    "ai-voice-interconnector daemon status --json para diagnosticarlo; " +
+    "el daemon no se arrancó."
+  );
 }
 
 async function main(): Promise<void> {
@@ -43,31 +62,55 @@ async function main(): Promise<void> {
     );
   }
 
-  // doctor --json imprime el reporte aun cuando falla (exit != 0 si hay FAIL).
+  // doctor --json imprime el reporte también en el veredicto negativo (exit 1)
+  // y en el fallo del comando (doctor_failed); el veredicto sale del exit más
+  // el reporte parseado, nunca de un campo status.
   const res = runCli(cli, ["doctor", "--json"], {
     encoding: "utf8",
     timeout: 20000,
     windowsHide: true,
   });
 
-  // Si no se pudo ejecutar el diagnóstico, no molestar (no hay dato accionable).
+  // Sin dato accionable (error de ejecución o stdout vacío): incierto, en
+  // silencio.
   if (res.error || typeof res.stdout !== "string" || !res.stdout.trim()) ok();
 
-  // Se toma solo el primer objeto JSON: en caso de fallo el stdout trae el
-  // reporte y un {error,…} concatenado que rompería un JSON.parse del total.
+  const exitCode = typeof res.status === "number" ? res.status : null;
   const report = parseFirstJsonObject(res.stdout);
+  const decision = decideHealthAction({ exitCode, report });
 
-  // El daemon solo se consulta cuando el reporte es "ok" (única rama que puede
-  // requerir calentarlo); en los demás casos se evita esa I/O.
-  const daemonRunning = report?.status === "ok" ? isDaemonRunning(cli) : false;
-  const decision = decideHealthAction(report, daemonRunning);
-
-  // notify: avisa al usuario. warm: deja el daemon caliente para la sesión
-  // (fire-and-forget, sin bloquear ni molestar si falla). noop: nada que hacer.
+  // notify: aviso por cada check fallido o fallo del diagnóstico, sin tocar el
+  // daemon. uncertain: sin daemon ni remedio inventado.
   if (decision.kind === "notify") notify(decision.message);
-  if (decision.kind === "warm") startDaemonDetached(cli);
+  if (decision.kind === "uncertain") ok();
 
-  ok();
+  // Solo un diagnóstico sano consulta el daemon (única rama que puede
+  // calentarlo).
+  const status = getDaemonStatus(cli);
+
+  if (status.kind === "running") {
+    if (status.warm === "warm_failed") {
+      notify(
+        "tts-sidecar-narrator: el daemon está corriendo pero el calentamiento " +
+          "del modelo falló (warm_failed); la primera narración puede tardar o " +
+          "fallar. Ejecuta ai-voice-interconnector daemon status --json para " +
+          "el detalle.",
+      );
+    }
+    // warming, warm o sin warm: no molestar.
+    ok();
+  }
+
+  if (status.kind === "stopped") {
+    // Arranque único, desanclado y best-effort ante el único estado que lo
+    // permite.
+    startDaemonDetached(cli);
+    ok();
+  }
+
+  // degraded o incierto: aviso acotado remitiendo al comando oficial, sin
+  // arrancar.
+  notify(daemonStatusMessage(status));
 }
 
 main().catch(() => process.exit(0));

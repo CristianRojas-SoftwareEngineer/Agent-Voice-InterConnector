@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
-import { makeTempDir, removeDir } from "./helpers.js";
+import { makeTempDir, removeDir, waitFor } from "./helpers.js";
 
 const HEALTH = join(process.cwd(), "dist", "health-check.js");
 
@@ -184,7 +184,7 @@ test("sano + daemon running: no avisa, consulta el estado y no arranca", () => {
   }
 });
 
-test("sano + daemon stopped limpio: arranca el daemon exactamente una vez", () => {
+test("sano + daemon stopped limpio: arranca el daemon exactamente una vez", async () => {
   const dir = makeTempDir("narrator-health-cli-");
   try {
     const { argvLog } = makeFakeCli(dir, {
@@ -195,6 +195,8 @@ test("sano + daemon stopped limpio: arranca el daemon exactamente una vez", () =
     assert.equal(res.status, 0);
     assert.ok(!res.stdout.includes("systemMessage"));
     assert.ok(invoked(argvLog, ["daemon", "status", "--json"]));
+    // El arranque es desanclado: el hijo puede tardar en anotar su argv.
+    assert.ok(await waitFor(() => startCount(argvLog) === 1));
     assert.equal(startCount(argvLog), 1);
   } finally {
     removeDir(dir);
