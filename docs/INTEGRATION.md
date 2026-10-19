@@ -2,8 +2,9 @@
 
 Este documento describe la integración de `tts-sidecar-narrator` con el motor de síntesis **AI-Voice-InterConnector**, desde la perspectiva del **plugin (el consumidor)**.
 
-La contraparte, escrita desde la perspectiva del motor, está en el repositorio de AI-Voice-InterConnector:
-[docs/CLAUDE-CODE-INTEGRATION.md](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/docs/CLAUDE-CODE-INTEGRATION.md).
+La contraparte, escrita desde la perspectiva del motor, está en su contrato público:
+[docs/CLI/CONTRACT.md §12 «Contratos externos»](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/v0.34.0/docs/CLI/CONTRACT.md#12-contratos-externos)
+(tag `v0.34.0`).
 
 ## Tabla de contenidos
 
@@ -13,6 +14,7 @@ La contraparte, escrita desde la perspectiva del motor, está en el repositorio 
 - [Cómo lo usan los hooks](#cómo-lo-usan-los-hooks)
 - [Requisitos sobre el motor](#requisitos-sobre-el-motor)
 - [Degradación y no intrusión](#degradación-y-no-intrusión)
+- [Troubleshooting](#troubleshooting)
 - [Estabilidad del contrato](#estabilidad-del-contrato)
 
 ## Rol en el sistema de narración
@@ -35,7 +37,7 @@ El único punto de acoplamiento es el ejecutable `ai-voice-interconnector` en el
 | #   | Superficie                                                                            | Uso en el plugin                                                                                                                                                                                                                                                                                                                                                                               |
 | --- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `ai-voice-interconnector speech say --text "<msg>" --daemon`                          | Síntesis y reproducción de cada locución dinámica. **Requiere el daemon vivo** (exit `5` si está caído; no lo arranca solo); por eso el plugin lo mantiene caliente.                                                                                                                                                                                                                           |
-| 2   | `ai-voice-interconnector doctor --json`                                               | Verificación del entorno al iniciar sesión. Se parsea el objeto plano `{ status, issues[], data_dir, hf_cache, base_status }`: `status` es `ok` o `failed`, y `issues` lista los problemas como cadenas. En caso de fallo el `stdout` trae **dos objetos** JSON concatenados (el reporte y luego un `{error,…}`); solo se toma el **primero** (contrato `docs/CLI/CONTRACT.md §12` del motor). |
+| 2   | `ai-voice-interconnector doctor --json`                                               | Verificación del entorno al iniciar sesión. El motor emite **exactamente un** objeto JSON, con `checks` (una entrada `{name, ok, detail}` por chequeo) y `failed` (`string[]` con los nombres fallidos): el entorno está sano si `failed` está vacío. Exit `0` = sano; exit `1` = veredicto negativo (mismo reporte, sin objeto `error`); exit `1` con `reason: "doctor_failed"` = fallo del comando (contrato `docs/CLI/CONTRACT.md §12` del motor). |
 | 3   | `ai-voice-interconnector daemon status --json`                                        | Comprueba si el daemon corre antes de intentar levantarlo. El motor emite `{"daemon":"running"}`: una cadena en la clave `daemon`, no un booleano `running`.                                                                                                                                                                                                                                   |
 | 4   | `ai-voice-interconnector daemon start`                                                | Levanta el daemon de forma desanclada para dejar el modelo en memoria.                                                                                                                                                                                                                                                                                                                         |
 | 5   | `ai-voice-interconnector speech synthesize --text "<aviso>" --label <label> --daemon` | Pre-síntesis única de los avisos estáticos (`narrate-ctl presynth`, invocado por la instalación guiada). El label es un slug semántico fijo; exit `6` (label ya existe) se trata como «ya pre-sintetizado» (idempotencia). `narrate-ctl presynth --force` añade `--force` para sobrescribir el WAV existente (re-sync tras cambiar una frase). Exit `5` daemon caído, `4` modelo ausente.      |
@@ -57,10 +59,14 @@ El único punto de acoplamiento es el ejecutable `ai-voice-interconnector` en el
 - **`SubagentStop` / `StopFailure` / `Notification`** → reproducen su anuncio
   pre-sintetizado con `speech play --label …`: sin LLM ni síntesis por evento. Para
   `Notification` el mensaje específico sigue visible en pantalla.
-- **`SessionStart`** → `health-check` corre `doctor --json`. Si el entorno está
-  provisionado (`status == "ok"`) y el daemon no corre, lo levanta con `daemon start`
-  (fire-and-forget). Si falta el CLI o el entorno falla (`status == "failed"`), avisa
-  al usuario vía `systemMessage` y no hace nada más.
+- **`SessionStart`** → `health-check` corre `doctor --json` y decide por el exit y
+  el reporte. Solo tras un diagnóstico sano (exit `0` y `failed` vacío) consulta
+  `daemon status --json`; si el resultado es `stopped` limpio, levanta el daemon con
+  un **único** `daemon start` desanclado (fire-and-forget). Un resultado `degraded`
+  o incierto no arranca nada y avisa vía `systemMessage` remitiendo a
+  `daemon status --json`; `warm_failed` avisa sin reiniciar, y `warming` no bloquea
+  ni espera. Si el entorno falla (exit `1`, o `reason: "doctor_failed"`, o falta el
+  CLI), avisa vía `systemMessage` y no hace nada más. Termina siempre con exit `0`.
 - **Instalación** (`/tts-sidecar-narrator:install`) → `narrate-ctl presynth`
   pre-sintetiza los anuncios del catálogo (`src/message/static-announcements.ts`) con
   `speech synthesize … --daemon`, una sola vez y de forma idempotente.
@@ -71,12 +77,15 @@ La resolución del ejecutable la hace `lib/resolve-cli.ts`, que escanea el `PATH
 
 Para que la narración funcione, en la máquina del usuario debe existir:
 
-1. `ai-voice-interconnector` en el `PATH`, instalado con el instalador nativo por SO
-   (`install-linux.sh`, `install-macos.sh`, `install-windows.ps1`). El motor expone
-   el grupo `speech` (superficies 1, 5 y 6) que el plugin consume.
-2. El modelo `qwen3-tts-0.6b` en caché, descargado con `ai-voice-interconnector setup`
-   (los instaladores nativos lo encadenan). La narración usa la voz de fábrica
-   `default` y no pasa `--voice`.
+1. `ai-voice-interconnector` en el `PATH`, instalado con el instalador publicado en
+   la release del tag (`install.sh` para Linux/macOS e `install.ps1` para Windows).
+   El motor expone el grupo `speech` (superficies 1, 5 y 6) que el plugin consume.
+2. Los cinco modelos requeridos en caché, descargados con
+   `ai-voice-interconnector setup` (los instaladores lo encadenan):
+   `qwen3-tts-0.6b` (CustomVoice), `qwen3-tts-0.6b-base` (Base), `opus-mt-es-en`,
+   `opus-mt-en-es` y `parakeet-tdt-v3`. La voz Base es requerida por las voces
+   clonadas, incluida `default`. La narración usa la voz de fábrica `default` y no
+   pasa `--voice`.
 
 El comando `/tts-sidecar-narrator:install` del plugin guía ambos pasos.
 
@@ -84,6 +93,20 @@ El comando `/tts-sidecar-narrator:install` del plugin guía ambos pasos.
 
 Si el CLI no está en el `PATH`, el modelo no está en caché, o el daemon no responde, el plugin **degrada en silencio**: no reproduce audio, no bloquea ni retrasa el turno de Claude Code, y (solo en `SessionStart`) emite un aviso informativo. La ausencia del motor nunca es un error para el usuario de Claude Code.
 
+## Troubleshooting
+
+**Logs.** Son dos juegos distintos y no conviene mezclarlos: `worker.log` es el log
+**del plugin** (el worker registra ahí sus exits, avisos y fallos), mientras que
+los logs **del motor** son ficheros propios en
+`data/logs/<familia>_<token>_<ms>.log` (p. ej. `daemon_…`, `qwen3-tts_…`). Para
+afinar el nivel de detalle del daemon puede configurarse `RUST_LOG`; no se promete
+ningún `status.path.log`, que no forma parte del contrato.
+
+**Locuciones corruptas.** Tras un diagnóstico manual, el remedio seguro es quitar
+la locución con `speech remove --label <etiqueta> [--voice <voz>]` y re-sintetizarla
+con `narrate-ctl presynth`. No se recomienda `cleanup --all` ni ningún
+`doctor --repair` automático.
+
 ## Estabilidad del contrato
 
-El plugin asume estables los flags y el esquema JSON de las seis superficies de arriba. El contrato del motor (`docs/CLI/CONTRACT.md §12`) declara formalmente las superficies 1–4; las superficies 5 y 6 (`speech synthesize` / `speech play`) las adopta este plugin bajo el compromiso de estabilidad publicado del grupo `speech`, y se declaran solo de este lado. Si una versión de AI-Voice-InterConnector cambia, por ejemplo, el campo `status` de `doctor --json`, o el campo `running` de `daemon status --json`, la integración se rompe. Esa lista es el contrato que ambos proyectos deben cuidar; su contraparte formal vive en el documento de integración del motor.
+El plugin asume estables los flags y el esquema JSON de las seis superficies de arriba. El contrato del motor (`docs/CLI/CONTRACT.md §12`, corte verificado en el tag `v0.34.0`) publica exactamente esas seis superficies: `speech say --text "<msg>" --daemon`, `speech synthesize --text "<aviso>" --label <label>`, `speech play --label <label>`, `doctor --json`, `daemon status --json` y `daemon start` (`daemon stop`, `self *`, `cleanup`, `dub` y `transcribe` no forman parte del contrato del plugin). Si una versión de AI-Voice-InterConnector cambia, por ejemplo, las claves `checks`/`failed` de `doctor --json`, o la clave `daemon` (cadena `"running"`/`"stopped"`) de `daemon status --json`, la integración se rompe. Esa lista es el contrato que ambos proyectos deben cuidar; su contraparte formal vive en la §12 del contrato del motor.
