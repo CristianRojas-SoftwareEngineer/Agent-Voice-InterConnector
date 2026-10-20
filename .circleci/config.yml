@@ -83,6 +83,17 @@ jobs:
             # otra versión) debe fallar aquí, no pasar de largo.
             test "$(claude --version)" = "<< pipeline.parameters.claude_cli_version >> (Claude Code)" \
               || { echo "Versión del CLI inesperada: $(claude --version)"; exit 1; }
+            # Cada paso de CircleCI corre en una shell nueva, así que un `export`
+            # aquí no llega al paso siguiente. BASH_ENV es el fichero que
+            # CircleCI sourcea al inicio de cada paso: el PATH (y las variables
+            # que bloquean el auto-updater) tienen que quedar ahí para que el
+            # paso de validación encuentre el binario.
+            {
+              echo 'export PATH="$HOME/.claude-cli/node_modules/.bin:$PATH"'
+              echo 'export DISABLE_AUTOUPDATER=1'
+              echo 'export DISABLE_UPDATES=1'
+              echo 'export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1'
+            } >> "$BASH_ENV"
             echo "[STEP] Install Claude Code CLI (pinned << pipeline.parameters.claude_cli_version >>) - FIN"
       - run:
           name: Validate plugin manifests (claude plugin validate --strict)
