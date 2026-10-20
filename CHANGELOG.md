@@ -55,6 +55,17 @@ play`) en vez de re-sintetizarse en cada aparición: el catálogo único de
 
 ### Añadido
 
+- **Puerta de validación de manifiestos en el CI** (job `validate-manifest` en
+  `.circleci/config.yml`): valida `.claude-plugin/plugin.json` y
+  `.claude-plugin/marketplace.json` con `claude plugin validate --strict`, que
+  es el único comando que rechaza los nombres de plugin que Anthropic reserva
+  (por ejemplo, el prefijo `claude-`) y los que no son kebab-case, requisitos
+  del marketplace de Claude.ai. Cubre un hueco real: typecheck, build y los
+  tests nunca miran `.claude-plugin/`, así que un manifiesto inválido llegaba al
+  commit y al push con el pipeline en verde. La versión del CLI queda pineada en
+  el parámetro `claude_cli_version` (misma política de pins que `node_version`),
+  porque el veredicto del validador cambia entre versiones. El job no necesita
+  secretos: el validador es un análisis local, sin red ni autenticación.
 - **Subcomando `narrate-ctl presynth`**: pre-sintetiza los seis anuncios del catálogo con
   `speech synthesize --daemon`, idempotente por defecto (exit `6` del
   motor = «ya pre-sintetizado»). Integrado en la instalación guiada

@@ -32,8 +32,8 @@ Cómo se corta y publica una versión de **Agent Voice InterConnector**. El proc
 
 Antes de empezar el checklist, en `main` debe estar todo en verde:
 
-1. El pipeline de CircleCI (triple puerta `test-linux`/`test-windows`/
-   `test-macos`) en verde sobre el commit candidato.
+1. El pipeline de CircleCI (cuarta puerta `validate-manifest` y triple puerta
+   `test-linux`/`test-windows`/`test-macos`) en verde sobre el commit candidato.
 2. Ningún cambio pendiente en el árbol (`git status` limpio).
 
 ## Checklist de release
@@ -56,6 +56,14 @@ En orden; cada paso asume el anterior.
    `check-dist` en verde es obligatorio: lo que ejecutan los usuarios es el `dist/` del árbol de git.
    El hook en `.githooks/pre-commit` corre `npm run build` y staggea `dist/` en cada commit, así que no
    hace falta invocarlo manualmente.
+   La identidad pública del plugin se verifica aparte, con el mismo gate que el CI
+   (job `validate-manifest`):
+   ```bash
+   claude plugin validate --strict .
+   ```
+   Este paso es el que detecta un `name` de plugin que Anthropic reserva (p. ej. el
+   prefijo `claude-`) o que no es kebab-case, requisitos del marketplace de Claude.ai
+   que el resto del checklist no mira.
 4. **Verificar la versión del motor declarada**: la versión de
    AI-Voice-InterConnector declarada en el README («Prerequisitos») y en
    [`docs/INTEGRATION.md`](INTEGRATION.md) («Requisitos sobre el motor») debe
@@ -357,11 +365,14 @@ Select-String -Path "$PLUGIN_DEV\package.json","$PLUGIN_DEV\.claude-plugin\plugi
 
 # 3. Cortar el changelog: editar CHANGELOG.md manualmente.
 
-# 4. Verificar dist/.
+# 4. Verificar dist/ y la identidad publica del plugin.
 Push-Location $PLUGIN_DEV
 npm run check-dist
 npm run typecheck
 npm test
+# Mismo gate que el job validate-manifest del CI: rechaza los nombres de plugin
+# reservados por Anthropic y los que no son kebab-case.
+claude plugin validate --strict .
 Pop-Location
 
 # 5. Verificar referencias cruzadas con el motor.

@@ -3,7 +3,7 @@ version: 2.1
 orbs:
   win: circleci/windows@5.0
 
-# Fuente única del pin de Node (espejo de la política de pins del motor
+# Fuente única de los pins de entorno-CI (espejo de la política de pins del motor
 # AI-Voice-InterConnector: cada versión de entorno-CI vive aquí y se interpola en los
 # jobs). Actualizar la versión = editar solo esta sección… y el digest de la
 # imagen Docker y el SHA-256 del tarball macOS, que van pineados junto a su
@@ -15,6 +15,17 @@ parameters:
     description: >
       Node exacto usado en los tres jobs (imagen cimg/node en Linux, choco en
       Windows, tarball oficial en macOS). Espejo entre plataformas.
+  claude_cli_version:
+    type: string
+    default: "2.1.304"
+    description: >
+      Versión exacta del CLI de Claude Code que valida los manifiestos del plugin
+      (`claude plugin validate --strict`). Se pinnea con la misma política que
+      node_version porque el veredicto del validador cambia entre versiones: un
+      salto del CLI puede introducir checks nuevos y romper el pipeline sin
+      cambios en el repo. Bump manual: tomar la versión vigente en
+      https://downloads.claude.ai/claude-code-releases/latest y verificar en local
+      que `claude plugin validate --strict .` sigue pasando.
 
 # Diferencia deliberada con el pipeline del motor — el disparador: el CircleCI
 # de AI-Voice-InterConnector corre solo en tags `v*` porque existe para construir y
@@ -28,8 +39,58 @@ parameters:
 # el motor) es la única forma realista de ejercitar las ramas por SO de
 # state-dir.ts y resolve-cli.ts sobre los tres sistemas reales. No requiere
 # secretos: los tests de providers mockean fetch y nunca llaman a APIs reales.
+#
+# El cuarto job, validate-manifest, NO es una cuarta puerta por SO: valida un
+# manifiesto JSON, cuyo resultado no depende del sistema operativo, así que se
+# replica solo en Linux. Cubre un hueco real: typecheck, build y tests nunca
+# miran .claude-plugin/, de modo que un nombre de plugin inválido (por ejemplo
+# uno que Anthropic reserva) llegaba al commit y al push con el pipeline en
+# verde. Sigue la nomenclatura de gates del motor (validate-licenses,
+# validate-changelog) y no necesita secretos: `claude plugin validate` es un
+# análisis local de los manifiestos, sin red ni autenticación.
 
 jobs:
+  validate-manifest:
+    # Gate de identidad pública del plugin: valida .claude-plugin/plugin.json y
+    # .claude-plugin/marketplace.json con `claude plugin validate --strict`, el
+    # único comando que rechaza los nombres de plugin que Anthropic reserva (el
+    # prefijo `claude-`, entre otros) y que exige kebab-case para el sync al
+    # marketplace de Claude.ai. Sin este gate, un manifiesto inválido llega al
+    # commit y al push: typecheck, build y tests no lo miran.
+    docker:
+      # Misma imagen fijada por digest que test-linux (misma política de pin).
+      - image: cimg/node:24.13.1@sha256:5d77ee6db8cb46bc53f329d94d84cc7afa8c522e34729abf79026085971c26b9
+    steps:
+      - checkout
+      - run:
+          name: Install Claude Code CLI (pinned << pipeline.parameters.claude_cli_version >>)
+          command: |
+            echo "[STEP] Install Claude Code CLI (pinned << pipeline.parameters.claude_cli_version >>) - INICIO"
+            # El validador es local (no hace red ni pide credenciales), pero el
+            # CLI sí intentaría actualizar su binario en segundo plano: se
+            # bloquea para que el binario no derive durante el run y para que
+            # el job no dependa de ningún servicio externo.
+            export DISABLE_AUTOUPDATER=1
+            export DISABLE_UPDATES=1
+            export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+            # Prefijo en el HOME del runner: sin permisos de admin y sin tocar
+            # el package.json del repo, así que `npm ci` sigue validando el
+            # lockfile igual.
+            npm install --prefix "$HOME/.claude-cli" --no-audit --no-fund \
+              "@anthropic-ai/claude-code@<< pipeline.parameters.claude_cli_version >>"
+            export PATH="$HOME/.claude-cli/node_modules/.bin:$PATH"
+            # Aserción de versión: un pin que no se instala (o que se resuelve a
+            # otra versión) debe fallar aquí, no pasar de largo.
+            test "$(claude --version)" = "<< pipeline.parameters.claude_cli_version >> (Claude Code)" \
+              || { echo "Versión del CLI inesperada: $(claude --version)"; exit 1; }
+            echo "[STEP] Install Claude Code CLI (pinned << pipeline.parameters.claude_cli_version >>) - FIN"
+      - run:
+          name: Validate plugin manifests (claude plugin validate --strict)
+          command: |
+            echo "[STEP] Validate plugin manifests (claude plugin validate --strict) - INICIO"
+            claude plugin validate --strict .
+            echo "[STEP] Validate plugin manifests (claude plugin validate --strict) - FIN"
+
   test-linux:
     docker:
       # Imagen fijada por digest (misma política que el motor). Bump manual:
@@ -198,6 +259,7 @@ workflows:
     # (default de CircleCI), coherente con que el release del plugin no
     # publica artefactos.
     jobs:
+      - validate-manifest
       - test-linux
       - test-windows
       - test-macos

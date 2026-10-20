@@ -124,9 +124,17 @@ npm run check-dist # verifica que dist/ está sincronizado con src/
 npm test          # suite de tests (node --test, sin framework externo)
 ```
 
+El nombre del plugin es su identidad pública (`/plugin install agent-voice-interconnector@Agent-Voice-InterConnector` y el namespace `/agent-voice-interconnector:*`), y hay reglas que el CLI de Claude Code aplica sobre él: no puede empezar por `claude-` (Anthropic reserva ese prefijo) ni llevar mayúsculas (el marketplace de Claude.ai exige kebab-case). Para comprobarlo localmente:
+
+```bash
+claude plugin validate --strict .
+```
+
+Es el mismo gate que corre el CI, y no necesita credenciales ni conexión: solo analiza los manifiestos del repo.
+
 `dist/` **se commitea**: los plugins se instalan clonando el repo, así que el JS compilado debe estar en el árbol para que los hooks funcionen sin paso de build.
 
-El CI (CircleCI, [.circleci/config.yml](.circleci/config.yml)) corre `typecheck`, `npm run build` y la suite de tests en Linux, Windows y macOS en cada push — el mismo proveedor y nomenclatura de jobs que usa el motor.
+El CI (CircleCI, [.circleci/config.yml](.circleci/config.yml)) corre `typecheck`, `npm run build` y la suite de tests en Linux, Windows y macOS en cada push — el mismo proveedor y nomenclatura de jobs que usa el motor. Además, el job `validate-manifest` valida los manifiestos del plugin con `claude plugin validate --strict`, que es lo único que detecta un nombre de plugin inválido (reservado por Anthropic o no kebab-case): typecheck, build y tests nunca miran `.claude-plugin/`.
 
 ## Documentación
 
