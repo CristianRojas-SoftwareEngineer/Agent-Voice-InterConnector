@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 // State dir por convención de cada SO. Equivalente en miniatura al data_root()
-// de AI-Voice-InterConnector, sin depender de él. Contiene config.json, worker.pid,
+// de AI Voice-InterConnector, sin depender de él. Contiene config.json, worker.pid,
 // payload.json y worker.log.
 import { homedir, platform } from "node:os";
 import { join } from "node:path";

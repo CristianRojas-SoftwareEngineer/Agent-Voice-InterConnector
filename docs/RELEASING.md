@@ -1,6 +1,6 @@
 # Proceso de release
 
-Cómo se corta y publica una versión de **Agent Voice InterConnector**. El proceso es deliberadamente más simple que el del motor ([AI-Voice-InterConnector/docs/RELEASING.md](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/docs/RELEASING.md)): aquí no hay CI de publicación ni artefactos binarios por plataforma — el plugin se distribuye clonando el repo con `dist/` commiteado, y **el release es un tag de git precedido por este checklist**. El CI de CircleCI corre en cada push como verificación continua (no participa del corte); el marketplace de plugins de Claude Code resuelve las versiones desde los tags del repo.
+Cómo se corta y publica una versión de **Agent Voice-InterConnector**. El proceso es deliberadamente más simple que el del motor ([AI-Voice-InterConnector/docs/RELEASING.md](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/docs/RELEASING.md)): aquí no hay CI de publicación ni artefactos binarios por plataforma — el plugin se distribuye clonando el repo con `dist/` commiteado, y **el release es un tag de git precedido por este checklist**. El CI de CircleCI corre en cada push como verificación continua (no participa del corte); el marketplace de plugins de Claude Code resuelve las versiones desde los tags del repo.
 
 ## Tabla de contenidos
 
@@ -23,7 +23,7 @@ Cómo se corta y publica una versión de **Agent Voice InterConnector**. El proc
   `package.json` y `.claude-plugin/plugin.json`. Un release con los dos números
   distintos es un release inválido.
 - El versionado es **independiente del motor**: cada proyecto numera según su
-  propia historia. Excepción planificada: cuando AI-Voice-InterConnector alcance su
+  propia historia. Excepción planificada: cuando AI Voice-InterConnector alcance su
   `v1.0.0`, el plugin avanzará desde la versión que haya alcanzado
   directamente a `v1.0.0` (ver la nota de versionado en
   [CHANGELOG.md](../CHANGELOG.md)).
@@ -43,9 +43,9 @@ En orden; cada paso asume el anterior.
 1. **Bump de versión doble**: actualizar `version` en `package.json` **y** en
    `.claude-plugin/plugin.json` al mismo `X.Y.Z`.
 2. **Cortar la sección del changelog**: en `CHANGELOG.md`, renombrar
-   `## [Unreleased]` a `## [X.Y.Z] — AAAA-MM-DD` y dejar la entrada lista
+   `## [No publicado]` a `## [X.Y.Z] — AAAA-MM-DD` y dejar la entrada lista
    (incluida la versión del motor contra la que se verificó, ver la sección
-   de sincronización). Crear una nueva sección `## [Unreleased]` vacía encima
+   de sincronización). Crear una nueva sección `## [No publicado]` vacía encima
    y actualizar las referencias de enlaces del pie.
 3. **Verificar `dist/`** (el pre-commit hook lo regenera automáticamente al commitear):
    ```bash
@@ -65,7 +65,7 @@ En orden; cada paso asume el anterior.
    prefijo `claude-`) o que no es kebab-case, requisitos del marketplace de Claude.ai
    que el resto del checklist no mira.
 4. **Verificar la versión del motor declarada**: la versión de
-   AI-Voice-InterConnector declarada en el README («Prerequisitos») y en
+   AI Voice-InterConnector declarada en el README («Prrequisitos») y en
    [`docs/INTEGRATION.md`](INTEGRATION.md) («Requisitos sobre el motor») debe
    ser la que efectivamente se usó en el smoke test del paso 6.
 5. **Verificar referencias cruzadas en ambos repos**: el motor referencia al

@@ -192,8 +192,8 @@ function startDaemonDetached(cliPath) {
 }
 
 // src/lib/health-decision.ts
-var NOT_PROVISIONED_MESSAGE = "Agent Voice InterConnector: el entorno de voz no est\xE1 provisionado. Ejecuta ai-voice-interconnector setup para habilitar la narraci\xF3n por voz.";
-var DOCTOR_FAILED_MESSAGE = "Agent Voice InterConnector: el diagn\xF3stico del motor (doctor) fall\xF3 y no produjo un veredicto. Ejecuta ai-voice-interconnector doctor --json manualmente.";
+var NOT_PROVISIONED_MESSAGE = "Agent Voice-InterConnector: el entorno de voz no est\xE1 provisionado. Ejecuta ai-voice-interconnector setup para habilitar la narraci\xF3n por voz.";
+var DOCTOR_FAILED_MESSAGE = "Agent Voice-InterConnector: el diagn\xF3stico del motor (doctor) fall\xF3 y no produjo un veredicto. Ejecuta ai-voice-interconnector doctor --json manualmente.";
 var DOCTOR_JSON_HINT = "Ejecuta ai-voice-interconnector doctor --json para el detalle.";
 function parseFirstJsonObject(text) {
   const trimmed = text.trim();
@@ -265,7 +265,7 @@ function buildFailedMessage(report) {
     const detail = check ? check.detail : "";
     return detail ? `${name}: ${detail}.` : `${name}.`;
   });
-  return `Agent Voice InterConnector: el diagn\xF3stico del motor reporta chequeos fallidos. ${parts.join(" ")} ${DOCTOR_JSON_HINT}`;
+  return `Agent Voice-InterConnector: el diagn\xF3stico del motor reporta chequeos fallidos. ${parts.join(" ")} ${DOCTOR_JSON_HINT}`;
 }
 function decideHealthAction(input) {
   const { exitCode, report } = input;
@@ -294,7 +294,7 @@ function ok() {
 }
 function daemonStatusMessage(status) {
   const reason = status.kind === "degraded" ? `el daemon reporta degraded (${status.degraded})` : "el estado del daemon es incierto";
-  return `Agent Voice InterConnector: ${reason}. Ejecuta ai-voice-interconnector daemon status --json para diagnosticarlo; el daemon no se arranc\xF3.`;
+  return `Agent Voice-InterConnector: ${reason}. Ejecuta ai-voice-interconnector daemon status --json para diagnosticarlo; el daemon no se arranc\xF3.`;
 }
 async function main() {
   await readStdin();
@@ -303,7 +303,7 @@ async function main() {
   const cli = resolveCli();
   if (!cli) {
     notify(
-      "Agent Voice InterConnector: AI-Voice-InterConnector no est\xE1 en el PATH. Inst\xE1lalo y ejecuta ai-voice-interconnector setup para habilitar la narraci\xF3n por voz."
+      "Agent Voice-InterConnector: AI Voice-InterConnector no est\xE1 en el PATH. Inst\xE1lalo y ejecuta ai-voice-interconnector setup para habilitar la narraci\xF3n por voz."
     );
   }
   const res = runCli(cli, ["doctor", "--json"], {
@@ -321,7 +321,7 @@ async function main() {
   if (status.kind === "running") {
     if (status.warm === "warm_failed") {
       notify(
-        "Agent Voice InterConnector: el daemon est\xE1 corriendo pero el calentamiento del modelo fall\xF3 (warm_failed); la primera narraci\xF3n puede tardar o fallar. Ejecuta ai-voice-interconnector daemon status --json para el detalle."
+        "Agent Voice-InterConnector: el daemon est\xE1 corriendo pero el calentamiento del modelo fall\xF3 (warm_failed); la primera narraci\xF3n puede tardar o fallar. Ejecuta ai-voice-interconnector daemon status --json para el detalle."
       );
     }
     ok();

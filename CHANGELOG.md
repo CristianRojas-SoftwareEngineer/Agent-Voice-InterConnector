@@ -1,26 +1,34 @@
 # Changelog
 
-Todos los cambios notables de **Agent Voice InterConnector** se documentan en este archivo.
+Todos los cambios notables de **Agent Voice-InterConnector** se documentan en este archivo.
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 > **Nota sobre el versionado**: este plugin y su motor,
-> [AI-Voice-InterConnector](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector),
+> [AI Voice-InterConnector](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector),
 > llevan versionados **independientes**, cada uno reflejo de su propia historia
 > de desarrollo — lo que se sincroniza entre ambos es el lanzamiento, no el
 > número. La disparidad de números es temporal por decisión: durante el tramo
 > pre-1.0 el plugin publica sus versiones intermedias (`0.2.0`, `0.3.0`, …) a
-> su propio ritmo, y cuando AI-Voice-InterConnector alcance su `v1.0.0`, el plugin
+> su propio ritmo, y cuando AI Voice-InterConnector alcance su `v1.0.0`, el plugin
 > **avanzará desde la versión que haya alcanzado hasta ese momento
 > directamente a `1.0.0`**, en un release que acumule las correcciones
 > implementadas hasta entonces. Ese salto final de numeración será entonces
 > intencional, no un error de versionado.
 
-## [Unreleased]
+## [No publicado]
 
 ### Cambiado
 
-- **Renombrado del proyecto: de `tts-sidecar-narrator` a Agent Voice InterConnector**
+- **La marca del proyecto es ahora Agent Voice-InterConnector** en toda la prosa, y la
+  del motor, **AI Voice-InterConnector**. Antes convivían dos formas: «Agent Voice
+  InterConnector» sin guion en la prosa del plugin, y «AI-Voice-InterConnector» con
+  guion en la del motor. Las variantes en minúscula o con guiones adicionales no se
+  tocan: son la adaptación al formato que exige cada contexto —el slug del
+  repositorio, el nombre del CLI, el _state dir_ por SO, el `name` del plugin, el
+  namespace de comandos y el identificador de instalación son identificadores
+  técnicos, no marca—. Sin cambios de funcionalidad: solo texto.
+- **Renombrado del proyecto: de `tts-sidecar-narrator` a Agent Voice-InterConnector**
   (breaking). El plugin se llama `agent-voice-interconnector`; el namespace de
   comandos pasa a `/agent-voice-interconnector:install` y
   `/agent-voice-interconnector:narrate`; el id de instalación a
@@ -35,10 +43,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
   `speech remove --label`). El repo de GitHub se renombró in place: el nombre
   anterior redirige.
 - **Licencia del proyecto: de `GPL-3.0-or-later` a `MPL-2.0`** (copyleft a nivel de
-  archivo, en paridad con el motor AI-Voice-InterConnector). Quien modifique archivos
+  archivo, en paridad con el motor AI Voice-InterConnector). Quien modifique archivos
   cubiertos debe publicarlos bajo MPL-2.0; la obra mayor que los combina puede
   mantener su licencia propia. Ver `LICENSE` y `NOTICE`.
-- **Migración al motor AI-Voice-InterConnector**: la narración invoca
+- **Migración al motor AI Voice-InterConnector**: la narración invoca
   `speech say --text … --daemon` en lugar del comando `speak`, eliminado sin
   alias en el rediseño de CLI — con el comando anterior el plugin quedaba mudo
   por un fallo silencioso (exit `2` solo visible en `worker.log`).
@@ -121,5 +129,5 @@ Primera versión pública, lanzada en conjunto con el primer release público de
   la protección del `config.json` en Windows), `docs/RELEASING.md` (proceso
   de release y sincronización con el motor) y este changelog.
 
-[Unreleased]: https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector/compare/v0.1.0...HEAD
+[No publicado]: https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector/releases/tag/v0.1.0

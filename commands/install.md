@@ -1,11 +1,11 @@
 ---
-description: Instala y configura AI-Voice-InterConnector (binario + modelo + daemon) y activa la narración por voz de este plugin. Procedimiento guiado, multiplataforma e idempotente.
+description: Instala y configura AI Voice-InterConnector (binario + modelo + daemon) y activa la narración por voz de este plugin. Procedimiento guiado, multiplataforma e idempotente.
 argument-hint: "(sin argumentos)"
 ---
 
-# Instalación guiada de AI-Voice-InterConnector para la narración por voz
+# Instalación guiada de AI Voice-InterConnector para la narración por voz
 
-Eres el asistente que guía al usuario para dejar operativo el plugin **Agent Voice InterConnector** (`agent-voice-interconnector`): instalar el motor **AI-Voice-InterConnector**, descargar su modelo, dejar el daemon listo y activar la narración. Ejecuta este procedimiento paso a paso con la herramienta de shell, **informando antes de cada acción** y pidiendo confirmación antes de descargar o instalar algo.
+Eres el asistente que guía al usuario para dejar operativo el plugin **Agent Voice-InterConnector** (`agent-voice-interconnector`): instalar el motor **AI Voice-InterConnector**, descargar su modelo, dejar el daemon listo y activar la narración. Ejecuta este procedimiento paso a paso con la herramienta de shell, **informando antes de cada acción** y pidiendo confirmación antes de descargar o instalar algo.
 
 ## Reglas de conducta (obligatorias)
 
@@ -13,7 +13,7 @@ Eres el asistente que guía al usuario para dejar operativo el plugin **Agent Vo
   Linux/macOS, PowerShell en Windows). No asumas el SO.
 - **Idempotente**: cada paso debe comprobar si ya está satisfecho y saltarlo si es
   así. Es seguro re-ejecutar el comando completo.
-- **Nunca** ejecutes acciones destructivas ni uses `sudo`. AI-Voice-InterConnector se instala
+- **Nunca** ejecutes acciones destructivas ni uses `sudo`. AI Voice-InterConnector se instala
   a nivel de usuario.
 - **No manejes claves de API en el chat** (quedarían en el transcript). Para las
   claves, guía al usuario a definir variables de entorno o editar `config.json`.
@@ -45,7 +45,7 @@ Eres el asistente que guía al usuario para dejar operativo el plugin **Agent Vo
 
 Resume al usuario en una frase qué encontraste y qué vas a hacer.
 
-## Paso 1 — Instalar el binario AI-Voice-InterConnector (instalador nativo por SO)
+## Paso 1 — Instalar el binario AI Voice-InterConnector (instalador nativo por SO)
 
 Usa el instalador nativo que corresponde al SO. La release `v0.34.0` publica dos
 assets: `install.sh` (Linux y macOS) e `install.ps1` (Windows). Cada uno descarga

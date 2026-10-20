@@ -1,6 +1,6 @@
-# Integración con AI-Voice-InterConnector
+# Integración con AI Voice-InterConnector
 
-Este documento describe la integración de **Agent Voice InterConnector** con el motor de síntesis **AI-Voice-InterConnector**, desde la perspectiva del **plugin (el consumidor)**.
+Este documento describe la integración de **Agent Voice-InterConnector** con el motor de síntesis **AI Voice-InterConnector**, desde la perspectiva del **plugin (el consumidor)**.
 
 La contraparte, escrita desde la perspectiva del motor, está en su contrato público:
 [docs/CLI/CONTRACT.md §12 «Contratos externos»](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/v0.34.0/docs/CLI/CONTRACT.md#12-contratos-externos)
@@ -21,12 +21,12 @@ La contraparte, escrita desde la perspectiva del motor, está en su contrato pú
 
 El sistema de narración por voz tiene dos componentes con repositorios y ciclos de vida independientes:
 
-| Componente                      | Repositorio                                                                                            | Rol                                                                                                      |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| **Agent Voice InterConnector** (este) | [`Agent-Voice-InterConnector`](https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector) | **Cliente**: detecta eventos de la sesión de Claude Code, construye un mensaje corto y pide su síntesis. |
-| **AI-Voice-InterConnector**     | [`AI-Voice-InterConnector`](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector) | **Motor**: sintetiza voz 100 % offline y expone una CLI pública.                                         |
+| Componente                            | Repositorio                                                                                                  | Rol                                                                                                      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| **Agent Voice-InterConnector** (este) | [`Agent-Voice-InterConnector`](https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector) | **Cliente**: detecta eventos de la sesión de Claude Code, construye un mensaje corto y pide su síntesis. |
+| **AI Voice-InterConnector**           | [`AI-Voice-InterConnector`](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector)       | **Motor**: sintetiza voz 100 % offline y expone una CLI pública.                                         |
 
-El plugin **depende** de AI-Voice-InterConnector; AI-Voice-InterConnector **no** conoce ni depende del plugin. La relación es unidireccional.
+El plugin **depende** de AI Voice-InterConnector; AI Voice-InterConnector **no** conoce ni depende del plugin. La relación es unidireccional.
 
 ## Contrato: solo la CLI pública
 
@@ -109,4 +109,4 @@ con `narrate-ctl presynth`. No se recomienda `cleanup --all` ni ningún
 
 ## Estabilidad del contrato
 
-El plugin asume estables los flags y el esquema JSON de las seis superficies de arriba. El contrato del motor (`docs/CLI/CONTRACT.md §12`, corte verificado en el tag `v0.34.0`) publica exactamente esas seis superficies: `speech say --text "<msg>" --daemon`, `speech synthesize --text "<aviso>" --label <label>`, `speech play --label <label>`, `doctor --json`, `daemon status --json` y `daemon start` (`daemon stop`, `self *`, `cleanup`, `dub` y `transcribe` no forman parte del contrato del plugin). Si una versión de AI-Voice-InterConnector cambia, por ejemplo, las claves `checks`/`failed` de `doctor --json`, o la clave `daemon` (cadena `"running"`/`"stopped"`) de `daemon status --json`, la integración se rompe. Esa lista es el contrato que ambos proyectos deben cuidar; su contraparte formal vive en la §12 del contrato del motor.
+El plugin asume estables los flags y el esquema JSON de las seis superficies de arriba. El contrato del motor (`docs/CLI/CONTRACT.md §12`, corte verificado en el tag `v0.34.0`) publica exactamente esas seis superficies: `speech say --text "<msg>" --daemon`, `speech synthesize --text "<aviso>" --label <label>`, `speech play --label <label>`, `doctor --json`, `daemon status --json` y `daemon start` (`daemon stop`, `self *`, `cleanup`, `dub` y `transcribe` no forman parte del contrato del plugin). Si una versión de AI Voice-InterConnector cambia, por ejemplo, las claves `checks`/`failed` de `doctor --json`, o la clave `daemon` (cadena `"running"`/`"stopped"`) de `daemon status --json`, la integración se rompe. Esa lista es el contrato que ambos proyectos deben cuidar; su contraparte formal vive en la §12 del contrato del motor.

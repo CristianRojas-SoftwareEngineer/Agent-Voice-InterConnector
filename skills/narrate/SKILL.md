@@ -1,17 +1,17 @@
 ---
 name: narrate
-description: Controla la narración por voz de AI-Voice-InterConnector (activar/desactivar, modo de generación, estado) y narra texto a demanda. Úsala cuando el usuario pida "léeme esto en voz alta", "activa/desactiva la narración", "cambia el modo de narración", "narra ...", o pregunte por el estado o la configuración de la narración por voz.
+description: Controla la narración por voz de AI Voice-InterConnector (activar/desactivar, modo de generación, estado) y narra texto a demanda. Úsala cuando el usuario pida "léeme esto en voz alta", "activa/desactiva la narración", "cambia el modo de narración", "narra ...", o pregunte por el estado o la configuración de la narración por voz.
 ---
 
-# Narración por voz con AI-Voice-InterConnector
+# Narración por voz con AI Voice-InterConnector
 
-Esta skill opera el plugin **Agent Voice InterConnector** (`agent-voice-interconnector`), que narra por voz la actividad de la sesión. La **automatización por turno** la manejan los hooks (no esta skill); aquí se cubre el **uso consciente**: toggles, modo, estado y narración a demanda. Todas las operaciones pasan por un único script de control:
+Esta skill opera el plugin **Agent Voice-InterConnector** (`agent-voice-interconnector`), que narra por voz la actividad de la sesión. La **automatización por turno** la manejan los hooks (no esta skill); aquí se cubre el **uso consciente**: toggles, modo, estado y narración a demanda. Todas las operaciones pasan por un único script de control:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" <comando> [args]
 ```
 
-Ejecuta ese comando con la herramienta de shell. Es multiplataforma (Node ya está presente por ser el runtime de Claude Code) y no requiere que AI-Voice-InterConnector esté aprovisionado salvo para `say`.
+Ejecuta ese comando con la herramienta de shell. Es multiplataforma (Node ya está presente por ser el runtime de Claude Code) y no requiere que AI Voice-InterConnector esté aprovisionado salvo para `say`.
 
 ## Comandos
 
@@ -31,7 +31,7 @@ Tras `on`/`off`/`mode`, confirma al usuario el nuevo estado en una frase. Para `
 
 ## Narración a demanda ("léeme esto")
 
-Cuando el usuario pida narrar algo, **redacta tú un texto breve y natural en español** (una o dos frases, sin markdown ni símbolos, apto para leerse en voz alta) y pásalo a `say`. No narres bloques de código, rutas ni markdown crudo: parafrasea. Requiere que AI-Voice-InterConnector esté instalado y aprovisionado (`ai-voice-interconnector setup`); si `say` reporta que el CLI no está en el PATH, indícalo.
+Cuando el usuario pida narrar algo, **redacta tú un texto breve y natural en español** (una o dos frases, sin markdown ni símbolos, apto para leerse en voz alta) y pásalo a `say`. No narres bloques de código, rutas ni markdown crudo: parafrasea. Requiere que AI Voice-InterConnector esté instalado y aprovisionado (`ai-voice-interconnector setup`); si `say` reporta que el CLI no está en el PATH, indícalo.
 
 ## Configuración de claves (modo LLM)
 
@@ -46,4 +46,4 @@ Sin claves configuradas, el modo `llm` degrada de facto a `local`, que funciona 
 
 ## Privacidad (adviértelo al activar el modo LLM)
 
-El modo `llm` envía el último mensaje del asistente a un tercero (Google u OpenRouter), y solo en la ruta `Stop`: no envía el transcript ni el historial. Es un cambio de postura respecto al motor AI-Voice-InterConnector, que sintetiza 100 % offline. Si el usuario activa el modo `llm` o configura claves, recuérdaselo en una frase y menciona que `mode local` evita cualquier envío externo.
+El modo `llm` envía el último mensaje del asistente a un tercero (Google u OpenRouter), y solo en la ruta `Stop`: no envía el transcript ni el historial. Es un cambio de postura respecto al motor AI Voice-InterConnector, que sintetiza 100 % offline. Si el usuario activa el modo `llm` o configura claves, recuérdaselo en una frase y menciona que `mode local` evita cualquier envío externo.

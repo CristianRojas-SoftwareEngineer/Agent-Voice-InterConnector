@@ -4,7 +4,7 @@ orbs:
   win: circleci/windows@5.0
 
 # Fuente única de los pins de entorno-CI (espejo de la política de pins del motor
-# AI-Voice-InterConnector: cada versión de entorno-CI vive aquí y se interpola en los
+# AI Voice-InterConnector: cada versión de entorno-CI vive aquí y se interpola en los
 # jobs). Actualizar la versión = editar solo esta sección… y el digest de la
 # imagen Docker y el SHA-256 del tarball macOS, que van pineados junto a su
 # uso porque dependen de la versión.
@@ -28,7 +28,7 @@ parameters:
       que `claude plugin validate --strict .` sigue pasando.
 
 # Diferencia deliberada con el pipeline del motor — el disparador: el CircleCI
-# de AI-Voice-InterConnector corre solo en tags `v*` porque existe para construir y
+# de AI Voice-InterConnector corre solo en tags `v*` porque existe para construir y
 # publicar artefactos. El plugin no publica artefactos (su build vive
 # commiteado en dist/), así que este workflow invierte el filtro: corre en
 # cada push como verificación continua (typecheck + dist sincronizado + suite

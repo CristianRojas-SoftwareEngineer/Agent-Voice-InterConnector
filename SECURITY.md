@@ -2,7 +2,7 @@
 
 ## Versiones soportadas
 
-Agent Voice InterConnector está en desarrollo activo pre-1.0. Solo la última versión publicada recibe correcciones de seguridad.
+Agent Voice-InterConnector está en desarrollo activo pre-1.0. Solo la última versión publicada recibe correcciones de seguridad.
 
 | Versión | Soportada |
 | ------- | --------- |
@@ -22,7 +22,7 @@ Usa el canal privado de [**GitHub Security Advisories**](https://github.com/Cris
 
 Recibirás una respuesta inicial en un plazo razonable. Te pedimos no divulgar públicamente el problema hasta que exista una corrección disponible.
 
-Si la vulnerabilidad está en el motor de síntesis y no en el plugin, repórtala en el canal equivalente de [AI-Voice-InterConnector](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/security/advisories/new) (ver su [SECURITY.md](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/SECURITY.md)).
+Si la vulnerabilidad está en el motor de síntesis y no en el plugin, repórtala en el canal equivalente de [AI Voice-InterConnector](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/security/advisories/new) (ver su [SECURITY.md](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/SECURITY.md)).
 
 ## Modelo de amenaza
 
@@ -39,7 +39,7 @@ El plugin es un cliente delgado que corre dentro de la sesión de Claude Code de
 
 - En modo `llm` — **que solo se activa si el usuario configura una clave**, es un opt-in explícito — solo la ruta `Stop` puede enviar contenido a un tercero: el `last_assistant_message` del payload (ni transcript ni historial) viaja a la API de Gemini (Google) o de OpenRouter para redactar la locución. Ese texto viaja **sin sanear**: el modelo necesita el markdown original para entender la estructura del turno, así que de él solo se acota el tamaño (`clampHead`), nunca el contenido. Trata el modo `llm` como lo que es: compartir el último mensaje completo del turno con un tercero. El saneo de `src/message/sanitize.ts` se aplica a la salida del modelo y a la degradación local, nunca al material que sale: descarta el cuerpo de los bloques de código cercados, conserva el texto del código en línea (donde viajan las rutas y los identificadores) y elimina URLs, markdown y símbolos no narrables.
 - Los eventos `Notification`, `SubagentStop`, `StopFailure` y `UserPromptSubmit` **nunca** usan el modo `llm`: da igual la configuración de `messageMode` o las claves presentes, su locución es siempre un anuncio pre-sintetizado del catálogo (`src/message/static-announcements.ts`), reproducido con `speech play` y sin invocar ningún proveedor. Es una barrera estructural, no una omisión: `Notification` en particular suele dispararse en contextos sensibles (peticiones de permiso, alertas) y su texto ya viene redactado por Claude Code, así que no hay valor en parafrasearlo y sí riesgo en enviarlo a un tercero. En consecuencia, en modo `llm` el único evento que puede llegar a salir a la red es `Stop`, y solo si hay material narrable y una clave configurada.
-- En modo `local` (el comportamiento sin claves) **nada sale a la red**: el mensaje se construye de forma determinista y se sintetiza con el motor AI-Voice-InterConnector, que es 100 % offline.
+- En modo `local` (el comportamiento sin claves) **nada sale a la red**: el mensaje se construye de forma determinista y se sintetiza con el motor AI Voice-InterConnector, que es 100 % offline.
 - Las claves viajan **solo en headers** (`x-goog-api-key` / `Authorization: Bearer`), nunca en URLs (que suelen quedar en logs), y las peticiones van únicamente a los endpoints oficiales de cada proveedor. Esto está fijado por tests de contrato (`tests/providers.test.ts`).
 
 ### Qué no hace el plugin

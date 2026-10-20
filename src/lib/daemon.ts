@@ -4,7 +4,7 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// Consulta y arranque del daemon de AI-Voice-InterConnector vía su CLI pública. El daemon
+// Consulta y arranque del daemon de AI Voice-InterConnector vía su CLI pública. El daemon
 // mantiene el modelo en memoria: `speech say --daemon` lo requiere corriendo (no
 // lo arranca solo). El health-check lo levanta de forma desanclada al iniciar
 // sesión. El estado sale de `daemon status --json` (contrato v0.34.0: clave

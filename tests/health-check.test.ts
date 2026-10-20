@@ -398,7 +398,7 @@ test("sin CLI en el PATH: aviso de CLI ausente y exit 0", () => {
   const res = runHealth(null);
   assert.equal(res.status, 0);
   assert.match(res.stdout, /systemMessage/);
-  assert.match(res.stdout, /AI-Voice-InterConnector/);
+  assert.match(res.stdout, /AI Voice-InterConnector/);
 });
 
 test(

@@ -1,6 +1,6 @@
 # Avisos de atribución (NOTICE)
 
-Agent Voice InterConnector — Copyright © 2026 Cristián Rojas Arredondo.
+Agent Voice-InterConnector — Copyright © 2026 Cristián Rojas Arredondo.
 
 Este proyecto se distribuye bajo la **Mozilla Public License, v. 2.0**
 (ver `LICENSE`). Cada archivo fuente cubierto lleva la cabecera del Exhibit A
@@ -9,5 +9,5 @@ de la MPL-2.0 con el aviso de copyright; no elimines ni alteres esos avisos
 
 - Proyecto: <https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector>
 - Licencia: MPL-2.0 — <https://mozilla.org/MPL/2.0/>
-- Este plugin invoca el motor AI-Voice-InterConnector, que se distribuye bajo
+- Este plugin invoca el motor AI Voice-InterConnector, que se distribuye bajo
   su propia licencia MPL-2.0 (ver su repositorio).
