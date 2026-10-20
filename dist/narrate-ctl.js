@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
-var APP_DIR = "claude-voice-interconnector";
+var APP_DIR = "agent-voice-interconnector";
 function stateDir() {
   const home = homedir();
   switch (platform()) {

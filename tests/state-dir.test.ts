@@ -22,7 +22,7 @@ import {
 } from "../src/lib/state-dir.js";
 import { fakePlatform, withEnv, makeTempDir, removeDir } from "./helpers.js";
 
-const APP = "claude-voice-interconnector";
+const APP = "agent-voice-interconnector";
 
 test("Windows: usa LOCALAPPDATA cuando está definida", () => {
   const restoreP = fakePlatform("win32");

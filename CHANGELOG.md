@@ -1,6 +1,6 @@
 # Changelog
 
-Todos los cambios notables de `claude-voice-interconnector` se documentan en este archivo.
+Todos los cambios notables de **Agent Voice InterConnector** se documentan en este archivo.
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
@@ -20,13 +20,14 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Cambiado
 
-- **Renombrado del proyecto: de `tts-sidecar-narrator` a `claude-voice-interconnector`**
-  (breaking). El namespace de comandos pasa a
-  `/claude-voice-interconnector:install` y `/claude-voice-interconnector:narrate`;
-  el id de instalación a `claude-voice-interconnector@claude-voice-interconnector`;
-  el _state dir_ por SO a `%LOCALAPPDATA%\claude-voice-interconnector` (Windows),
-  `~/.local/state/claude-voice-interconnector` (Linux) o
-  `~/Library/Application Support/claude-voice-interconnector` (macOS), por lo que
+- **Renombrado del proyecto: de `tts-sidecar-narrator` a Agent Voice InterConnector**
+  (breaking). El plugin se llama `agent-voice-interconnector`; el namespace de
+  comandos pasa a `/agent-voice-interconnector:install` y
+  `/agent-voice-interconnector:narrate`; el id de instalación a
+  `agent-voice-interconnector@Agent-Voice-InterConnector`; el _state dir_ por SO
+  a `%LOCALAPPDATA%\agent-voice-interconnector` (Windows),
+  `~/.local/state/agent-voice-interconnector` (Linux) o
+  `~/Library/Application Support/agent-voice-interconnector` (macOS), por lo que
   la `config.json` existente queda huérfana y hay que re-ejecutar la instalación
   guiada o recrearla; y los labels de las locuciones pre-sintetizadas de
   `narrator-*` a `voice-*` (re-ejecutar `presynth` con el daemon caliente regenera
@@ -57,7 +58,7 @@ play`) en vez de re-sintetizarse en cada aparición: el catálogo único de
 - **Subcomando `narrate-ctl presynth`**: pre-sintetiza los seis anuncios del catálogo con
   `speech synthesize --daemon`, idempotente por defecto (exit `6` del
   motor = «ya pre-sintetizado»). Integrado en la instalación guiada
-  (`/claude-voice-interconnector:install`) y re-ejecutable a mano tras borrar la caché
+  (`/agent-voice-interconnector:install`) y re-ejecutable a mano tras borrar la caché
   del motor. Acepta `--force` (alias `-f`), que pasa `--force` al motor para
   sobrescribir el WAV de un label existente: el re-sync manual tras cambiar la
   frase de un anuncio (como el label es fijo, `presynth` a secas no detecta el
@@ -109,5 +110,5 @@ Primera versión pública, lanzada en conjunto con el primer release público de
   la protección del `config.json` en Windows), `docs/RELEASING.md` (proceso
   de release y sincronización con el motor) y este changelog.
 
-[Unreleased]: https://github.com/CristianRojas-SoftwareEngineer/claude-voice-interconnector/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/CristianRojas-SoftwareEngineer/claude-voice-interconnector/releases/tag/v0.1.0
+[Unreleased]: https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector/releases/tag/v0.1.0

@@ -1,4 +1,4 @@
-# claude-voice-interconnector
+# Agent Voice InterConnector
 
 Plugin de [Claude Code](https://code.claude.com) que **narra por voz** la actividad de la sesión usando [AI-Voice-InterConnector](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector). Al final de cada turno (y en anuncios relevantes) escuchas un mensaje conversacional corto — no el texto en bruto del asistente, sino una locución procesada, en español.
 
@@ -52,15 +52,15 @@ El flujo para el usuario final es de **dos pasos**:
 1. **Instalar el plugin** desde un marketplace (repo git), lo que persiste entre
    sesiones:
    ```
-   /plugin marketplace add CristianRojas-SoftwareEngineer/claude-voice-interconnector
-   /plugin install claude-voice-interconnector@claude-voice-interconnector
+   /plugin marketplace add CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector
+   /plugin install agent-voice-interconnector@Agent-Voice-InterConnector
    ```
 2. **Instalar y configurar el motor** invocando el comando de instalación
    guiado, que detecta el SO, instala el binario AI-Voice-InterConnector
    (instalador nativo por SO), descarga el modelo, deja el daemon listo,
    pre-sintetiza los anuncios (`narrate-ctl presynth`) y activa la narración:
    ```
-   /claude-voice-interconnector:install
+   /agent-voice-interconnector:install
    ```
 
 Durante el desarrollo, el plugin se carga apuntando al directorio del repo (no persiste; hay que pasarlo en cada arranque):
@@ -77,9 +77,9 @@ El estado vive en `config.json` dentro del _state dir_ por SO:
 
 | SO      | Ruta                                                                 |
 | ------- | -------------------------------------------------------------------- |
-| Windows | `%LOCALAPPDATA%\claude-voice-interconnector\config.json`                    |
-| Linux   | `${XDG_STATE_HOME:-~/.local/state}/claude-voice-interconnector/config.json` |
-| macOS   | `~/Library/Application Support/claude-voice-interconnector/config.json`     |
+| Windows | `%LOCALAPPDATA%\agent-voice-interconnector\config.json`                    |
+| Linux   | `${XDG_STATE_HOME:-~/.local/state}/agent-voice-interconnector/config.json` |
+| macOS   | `~/Library/Application Support/agent-voice-interconnector/config.json`     |
 
 ### Claves de API (modo `llm`)
 
@@ -103,7 +103,7 @@ Si prefieres persistencia en archivo —por ejemplo, cuando Claude Code se lanza
 - `messageMode`: `"llm"` (cadena completa) o `"local"` (solo constructor
   determinista, sin red). Sin ninguna key, `"llm"` degrada a `"local"` de facto.
 
-El archivo se crea con permisos restrictivos donde el SO lo soporta: `0600` en POSIX. En Windows ese bit es un no-op y la protección recae en las ACL del perfil sobre `%LOCALAPPDATA%`; el modelo de amenaza completo (qué se persiste, dónde y con qué permisos en cada SO) está en [SECURITY.md](SECURITY.md). La skill opcional (`/claude-voice-interconnector:narrate`) guía la configuración y expone los toggles.
+El archivo se crea con permisos restrictivos donde el SO lo soporta: `0600` en POSIX. En Windows ese bit es un no-op y la protección recae en las ACL del perfil sobre `%LOCALAPPDATA%`; el modelo de amenaza completo (qué se persiste, dónde y con qué permisos en cada SO) está en [SECURITY.md](SECURITY.md). La skill opcional (`/agent-voice-interconnector:narrate`) guía la configuración y expone los toggles.
 
 ## Privacidad
 

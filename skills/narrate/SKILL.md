@@ -5,7 +5,7 @@ description: Controla la narración por voz de AI-Voice-InterConnector (activar/
 
 # Narración por voz con AI-Voice-InterConnector
 
-Esta skill opera el plugin `claude-voice-interconnector`, que narra por voz la actividad de la sesión. La **automatización por turno** la manejan los hooks (no esta skill); aquí se cubre el **uso consciente**: toggles, modo, estado y narración a demanda. Todas las operaciones pasan por un único script de control:
+Esta skill opera el plugin **Agent Voice InterConnector** (`agent-voice-interconnector`), que narra por voz la actividad de la sesión. La **automatización por turno** la manejan los hooks (no esta skill); aquí se cubre el **uso consciente**: toggles, modo, estado y narración a demanda. Todas las operaciones pasan por un único script de control:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" <comando> [args]

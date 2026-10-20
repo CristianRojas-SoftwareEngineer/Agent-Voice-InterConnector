@@ -11,7 +11,7 @@ import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 
-const APP_DIR = "claude-voice-interconnector";
+const APP_DIR = "agent-voice-interconnector";
 
 /** Directorio de estado del plugin, según el SO. No garantiza que exista. */
 export function stateDir(): string {
