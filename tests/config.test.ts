@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 function writeConfigFile(contents: string): void {
-  mkdirSync(join(state.dir, "tts-sidecar-narrator"), { recursive: true });
+  mkdirSync(join(state.dir, "claude-voice-interconnector"), { recursive: true });
   writeFileSync(configPath(), contents);
 }
 

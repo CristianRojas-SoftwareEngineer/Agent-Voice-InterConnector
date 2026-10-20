@@ -5,7 +5,7 @@ argument-hint: "(sin argumentos)"
 
 # Instalación guiada de AI-Voice-InterConnector para la narración por voz
 
-Eres el asistente que guía al usuario para dejar operativo el plugin `tts-sidecar-narrator`: instalar el motor **AI-Voice-InterConnector**, descargar su modelo, dejar el daemon listo y activar la narración. Ejecuta este procedimiento paso a paso con la herramienta de shell, **informando antes de cada acción** y pidiendo confirmación antes de descargar o instalar algo.
+Eres el asistente que guía al usuario para dejar operativo el plugin `claude-voice-interconnector`: instalar el motor **AI-Voice-InterConnector**, descargar su modelo, dejar el daemon listo y activar la narración. Ejecuta este procedimiento paso a paso con la herramienta de shell, **informando antes de cada acción** y pidiendo confirmación antes de descargar o instalar algo.
 
 ## Reglas de conducta (obligatorias)
 
@@ -155,7 +155,7 @@ Interpreta el resultado:
 
 3. Reproducción de un anuncio pre-sintetizado (verifica la ruta `speech play` que usará
    `UserPromptSubmit`): toma un label de la salida del Paso 4 (por ejemplo el de
-   `UserPromptSubmit`, con forma de slug fijo como `narrator-user-prompt-submit`) y
+   `UserPromptSubmit`, con forma de slug fijo como `voice-user-prompt-submit`) y
    reprodúcelo:
 
    ```bash
@@ -172,6 +172,6 @@ Interpreta el resultado:
 
 ## Cierre
 
-Confirma al usuario, en pocas frases, que a partir de ahora **cada sesión de Claude Code narrará automáticamente**: el hook `SessionStart` verifica el entorno y levanta el daemon si hace falta; luego **cada evento registrado** (`UserPromptSubmit`, `Stop`, `SubagentStop`, `StopFailure` y `Notification`) genera y reproduce una locución corta. El daemon se relevanta solo en la primera sesión tras un reinicio (hook `SessionStart`), así que no hay mantenimiento manual. Recuérdale los controles a demanda de la skill `/tts-sidecar-narrator:narrate` (`on`/`off`/`mode`/`status`/`say`/`presynth`).
+Confirma al usuario, en pocas frases, que a partir de ahora **cada sesión de Claude Code narrará automáticamente**: el hook `SessionStart` verifica el entorno y levanta el daemon si hace falta; luego **cada evento registrado** (`UserPromptSubmit`, `Stop`, `SubagentStop`, `StopFailure` y `Notification`) genera y reproduce una locución corta. El daemon se relevanta solo en la primera sesión tras un reinicio (hook `SessionStart`), así que no hay mantenimiento manual. Recuérdale los controles a demanda de la skill `/claude-voice-interconnector:narrate` (`on`/`off`/`mode`/`status`/`say`/`presynth`).
 
 Menciona también el mantenimiento de los anuncios pre-sintetizados: si se borran las locuciones del almacén del motor (`<data_dir>/speech/<voz>/<etiqueta>.wav`), basta re-ejecutar `node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" presynth` con el daemon caliente (es idempotente; los anuncios vigentes no se re-sintetizan). Ten en cuenta que `--synthetic-speech` es una categoría de `cleanup`, no una carpeta. Como los labels son slugs fijos, si en una actualización del plugin **cambia la frase** de un anuncio, `presynth` a secas no lo detecta (el label no cambió): hay que forzar la sobreescritura con `node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" presynth --force`.

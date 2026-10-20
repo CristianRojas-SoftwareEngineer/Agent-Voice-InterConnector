@@ -1,8 +1,8 @@
-# Roadmap — tts-sidecar-narrator
+# Roadmap — claude-voice-interconnector
 
 Este documento fue originalmente el registro de preparación del primer release
 (`RELEASE-READINESS.md`). Ahora que `v0.1.0` está publicado
-([commit `f55e8c0`](https://github.com/CristianRojas-SoftwareEngineer/tts-sidecar-narrator/tree/v0.1.0),
+([commit `f55e8c0`](https://github.com/CristianRojas-SoftwareEngineer/claude-voice-interconnector/tree/v0.1.0),
 tag `v0.1.0`, 2026-07-22), se convierte en el **roadmap vivo** del plugin
 — el análogo del `ROADMAP.md` del motor AI-Voice-InterConnector, a escala de plugin.
 
@@ -66,9 +66,9 @@ medidos aún (se determinarán con uso real):
 No hay bugs reportados aún (beta). Esta sección se poblará con los reportes
 que lleguen tras el lanzamiento. El pipeline de CI y la suite de tests
 son la primera línea de defensa; el canal de reporte es
-[GitHub Security Advisories](https://github.com/CristianRojas-SoftwareEngineer/tts-sidecar-narrator/security/advisories)
+[GitHub Security Advisories](https://github.com/CristianRojas-SoftwareEngineer/claude-voice-interconnector/security/advisories)
 (para bugs de seguridad) e
-[issues públicos](https://github.com/CristianRojas-SoftwareEngineer/tts-sidecar-narrator/issues)
+[issues públicos](https://github.com/CristianRojas-SoftwareEngineer/claude-voice-interconnector/issues)
 (para el resto).
 
 ### Gobernanza de versión del motor
@@ -115,8 +115,8 @@ Resumen del diseño (`src/lib/config.ts`, `src/lib/state-dir.ts`):
 - Las claves se leen con precedencia **variable de entorno > `config.json` en
   el state dir por SO > sin configurar** (degrada a modo `local`).
 - `config.json` nunca vive en el repo; se crea en tiempo de ejecución en
-  `%LOCALAPPDATA%\tts-sidecar-narrator` (Windows), `~/.local/state/tts-sidecar-narrator`
-  (Linux) o `~/Library/Application Support/tts-sidecar-narrator` (macOS).
+  `%LOCALAPPDATA%\claude-voice-interconnector` (Windows), `~/.local/state/claude-voice-interconnector`
+  (Linux) o `~/Library/Application Support/claude-voice-interconnector` (macOS).
 - El archivo se escribe con permisos `0600` en POSIX. En Windows la protección
   depende de las ACL del perfil sobre `%LOCALAPPDATA%` (documentado en
   `SECURITY.md`).

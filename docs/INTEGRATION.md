@@ -1,6 +1,6 @@
 # Integración con AI-Voice-InterConnector
 
-Este documento describe la integración de `tts-sidecar-narrator` con el motor de síntesis **AI-Voice-InterConnector**, desde la perspectiva del **plugin (el consumidor)**.
+Este documento describe la integración de `claude-voice-interconnector` con el motor de síntesis **AI-Voice-InterConnector**, desde la perspectiva del **plugin (el consumidor)**.
 
 La contraparte, escrita desde la perspectiva del motor, está en su contrato público:
 [docs/CLI/CONTRACT.md §12 «Contratos externos»](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/v0.34.0/docs/CLI/CONTRACT.md#12-contratos-externos)
@@ -23,7 +23,7 @@ El sistema de narración por voz tiene dos componentes con repositorios y ciclos
 
 | Componente                      | Repositorio                                                                                            | Rol                                                                                                      |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| **tts-sidecar-narrator** (este) | `tts-sidecar-narrator`                                                                                 | **Cliente**: detecta eventos de la sesión de Claude Code, construye un mensaje corto y pide su síntesis. |
+| **claude-voice-interconnector** (este) | `claude-voice-interconnector`                                                                                 | **Cliente**: detecta eventos de la sesión de Claude Code, construye un mensaje corto y pide su síntesis. |
 | **AI-Voice-InterConnector**     | [`AI-Voice-InterConnector`](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector) | **Motor**: sintetiza voz 100 % offline y expone una CLI pública.                                         |
 
 El plugin **depende** de AI-Voice-InterConnector; AI-Voice-InterConnector **no** conoce ni depende del plugin. La relación es unidireccional.
@@ -67,7 +67,7 @@ El único punto de acoplamiento es el ejecutable `ai-voice-interconnector` en el
   `daemon status --json`; `warm_failed` avisa sin reiniciar, y `warming` no bloquea
   ni espera. Si el entorno falla (exit `1`, o `reason: "doctor_failed"`, o falta el
   CLI), avisa vía `systemMessage` y no hace nada más. Termina siempre con exit `0`.
-- **Instalación** (`/tts-sidecar-narrator:install`) → `narrate-ctl presynth`
+- **Instalación** (`/claude-voice-interconnector:install`) → `narrate-ctl presynth`
   pre-sintetiza los anuncios del catálogo (`src/message/static-announcements.ts`) con
   `speech synthesize … --daemon`, una sola vez y de forma idempotente.
 
@@ -87,7 +87,7 @@ Para que la narración funcione, en la máquina del usuario debe existir:
    clonadas, incluida `default`. La narración usa la voz de fábrica `default` y no
    pasa `--voice`.
 
-El comando `/tts-sidecar-narrator:install` del plugin guía ambos pasos.
+El comando `/claude-voice-interconnector:install` del plugin guía ambos pasos.
 
 ## Degradación y no intrusión
 

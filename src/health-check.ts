@@ -42,7 +42,7 @@ function daemonStatusMessage(status: DaemonStatusResult): string {
       ? `el daemon reporta degraded (${status.degraded})`
       : "el estado del daemon es incierto";
   return (
-    `tts-sidecar-narrator: ${reason}. Ejecuta ` +
+    `claude-voice-interconnector: ${reason}. Ejecuta ` +
     "ai-voice-interconnector daemon status --json para diagnosticarlo; " +
     "el daemon no se arrancó."
   );
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
   const cli = resolveCli();
   if (!cli) {
     notify(
-      "tts-sidecar-narrator: AI-Voice-InterConnector no está en el PATH. Instálalo y ejecuta " +
+      "claude-voice-interconnector: AI-Voice-InterConnector no está en el PATH. Instálalo y ejecuta " +
         "ai-voice-interconnector setup para habilitar la narración por voz.",
     );
   }
@@ -94,7 +94,7 @@ async function main(): Promise<void> {
   if (status.kind === "running") {
     if (status.warm === "warm_failed") {
       notify(
-        "tts-sidecar-narrator: el daemon está corriendo pero el calentamiento " +
+        "claude-voice-interconnector: el daemon está corriendo pero el calentamiento " +
           "del modelo falló (warm_failed); la primera narración puede tardar o " +
           "fallar. Ejecuta ai-voice-interconnector daemon status --json para " +
           "el detalle.",

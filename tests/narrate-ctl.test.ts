@@ -57,7 +57,7 @@ function runCtl(
 function readConfigFile(): Record<string, unknown> {
   const sub =
     process.platform === "darwin" ? join("Library", "Application Support") : "";
-  const path = join(stateBase, sub, "tts-sidecar-narrator", "config.json");
+  const path = join(stateBase, sub, "claude-voice-interconnector", "config.json");
   return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
 }
 

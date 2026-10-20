@@ -39,20 +39,20 @@ function announcement(text: string, label: string): Announcement {
 export const ANNOUNCEMENTS = {
   UserPromptSubmit: announcement(
     "Procesando con Claude.",
-    "narrator-user-prompt-submit",
+    "voice-user-prompt-submit",
   ),
-  Stop: announcement("El asistente terminó su turno.", "narrator-stop"),
+  Stop: announcement("El asistente terminó su turno.", "voice-stop"),
   SubagentStop: announcement(
     "El subagente completó su trabajo.",
-    "narrator-subagent-stop",
+    "voice-subagent-stop",
   ),
   StopFailure: announcement(
     "Ocurrió un error durante la ejecución.",
-    "narrator-stop-failure",
+    "voice-stop-failure",
   ),
   Notification: announcement(
     "Claude necesita tu atención.",
-    "narrator-notification",
+    "voice-notification",
   ),
-  Default: announcement("Notificación de Claude.", "narrator-default"),
+  Default: announcement("Notificación de Claude.", "voice-default"),
 } as const satisfies Record<string, Announcement>;

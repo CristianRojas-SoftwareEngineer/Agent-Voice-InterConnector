@@ -36,12 +36,12 @@ export type Decision =
 
 /** Aviso base por entorno de voz no provisionado. Fuente única. */
 export const NOT_PROVISIONED_MESSAGE =
-  "tts-sidecar-narrator: el entorno de voz no está provisionado. Ejecuta " +
+  "claude-voice-interconnector: el entorno de voz no está provisionado. Ejecuta " +
   "ai-voice-interconnector setup para habilitar la narración por voz.";
 
 /** Aviso cuando `doctor` falla como comando (reason doctor_failed). */
 const DOCTOR_FAILED_MESSAGE =
-  "tts-sidecar-narrator: el diagnóstico del motor (doctor) falló y no produjo " +
+  "claude-voice-interconnector: el diagnóstico del motor (doctor) falló y no produjo " +
   "un veredicto. Ejecuta ai-voice-interconnector doctor --json manualmente.";
 
 const DOCTOR_JSON_HINT =
@@ -151,7 +151,7 @@ function buildFailedMessage(report: DoctorReport): string {
     return detail ? `${name}: ${detail}.` : `${name}.`;
   });
   return (
-    "tts-sidecar-narrator: el diagnóstico del motor reporta chequeos " +
+    "claude-voice-interconnector: el diagnóstico del motor reporta chequeos " +
     `fallidos. ${parts.join(" ")} ${DOCTOR_JSON_HINT}`
   );
 }

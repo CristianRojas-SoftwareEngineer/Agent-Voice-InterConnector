@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
-var APP_DIR = "tts-sidecar-narrator";
+var APP_DIR = "claude-voice-interconnector";
 function stateDir() {
   const home = homedir();
   switch (platform()) {
@@ -243,7 +243,7 @@ var OpenRouterProvider = class {
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${this.apiKey}`,
-        "x-title": "tts-sidecar-narrator"
+        "x-title": "claude-voice-interconnector"
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
@@ -263,22 +263,22 @@ function announcement(text, label) {
 var ANNOUNCEMENTS = {
   UserPromptSubmit: announcement(
     "Procesando con Claude.",
-    "narrator-user-prompt-submit"
+    "voice-user-prompt-submit"
   ),
-  Stop: announcement("El asistente termin\xF3 su turno.", "narrator-stop"),
+  Stop: announcement("El asistente termin\xF3 su turno.", "voice-stop"),
   SubagentStop: announcement(
     "El subagente complet\xF3 su trabajo.",
-    "narrator-subagent-stop"
+    "voice-subagent-stop"
   ),
   StopFailure: announcement(
     "Ocurri\xF3 un error durante la ejecuci\xF3n.",
-    "narrator-stop-failure"
+    "voice-stop-failure"
   ),
   Notification: announcement(
     "Claude necesita tu atenci\xF3n.",
-    "narrator-notification"
+    "voice-notification"
   ),
-  Default: announcement("Notificaci\xF3n de Claude.", "narrator-default")
+  Default: announcement("Notificaci\xF3n de Claude.", "voice-default")
 };
 
 // src/message/sanitize.ts

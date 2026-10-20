@@ -49,7 +49,7 @@ export class OpenRouterProvider implements TextProvider {
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${this.apiKey}`,
-        "x-title": "tts-sidecar-narrator",
+        "x-title": "claude-voice-interconnector",
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

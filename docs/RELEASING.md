@@ -1,6 +1,6 @@
 # Proceso de release
 
-Cómo se corta y publica una versión de `tts-sidecar-narrator`. El proceso es deliberadamente más simple que el del motor ([AI-Voice-InterConnector/docs/RELEASING.md](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/docs/RELEASING.md)): aquí no hay CI de publicación ni artefactos binarios por plataforma — el plugin se distribuye clonando el repo con `dist/` commiteado, y **el release es un tag de git precedido por este checklist**. El CI de CircleCI corre en cada push como verificación continua (no participa del corte); el marketplace de plugins de Claude Code resuelve las versiones desde los tags del repo.
+Cómo se corta y publica una versión de `claude-voice-interconnector`. El proceso es deliberadamente más simple que el del motor ([AI-Voice-InterConnector/docs/RELEASING.md](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/docs/RELEASING.md)): aquí no hay CI de publicación ni artefactos binarios por plataforma — el plugin se distribuye clonando el repo con `dist/` commiteado, y **el release es un tag de git precedido por este checklist**. El CI de CircleCI corre en cada push como verificación continua (no participa del corte); el marketplace de plugins de Claude Code resuelve las versiones desde los tags del repo.
 
 ## Tabla de contenidos
 
@@ -130,10 +130,10 @@ Estas variables se reutilizan en varias fases; defínelas al inicio de la sesió
 $PLUGIN_DEV = (Get-Item .).FullName
 
 # Directorio temporal para el clon limpio del E2E.
-$PLUGIN_E2E = "$env:TEMP\tts-sidecar-narrator-e2e"
+$PLUGIN_E2E = "$env:TEMP\claude-voice-interconnector-e2e"
 
-# State dir del plugin (Windows): %LOCALAPPDATA%\tts-sidecar-narrator.
-$STATE_DIR = "$env:LOCALAPPDATA\tts-sidecar-narrator"
+# State dir del plugin (Windows): %LOCALAPPDATA%\claude-voice-interconnector.
+$STATE_DIR = "$env:LOCALAPPDATA\claude-voice-interconnector"
 
 # Versión del motor contra la que se verificará (la publicada).
 $MOTOR_VERSION = "vX.Y.Z"
@@ -232,14 +232,14 @@ se ejecuta **antes de publicar** el release del plugin, así que el clon sale de
 la **ruta local** del repositorio de desarrollo (`$PLUGIN_DEV`): en ese momento
 los cambios **aún no están en GitHub** y un clon remoto no los contendría. El
 clon desde GitHub
-(`git clone https://github.com/CristianRojas-SoftwareEngineer/tts-sidecar-narrator`)
+(`git clone https://github.com/CristianRojas-SoftwareEngineer/claude-voice-interconnector`)
 corresponde al smoke de una **release ya publicada**, no a éste.
 
 ```powershell
 if (-not (Test-Path $PLUGIN_E2E)) {
   # Smoke previo a publicar: clon local, porque los cambios aún no están en GitHub.
   # Para el smoke de una release ya publicada, clona en su lugar desde GitHub:
-  #   git clone https://github.com/CristianRojas-SoftwareEngineer/tts-sidecar-narrator $PLUGIN_E2E
+  #   git clone https://github.com/CristianRojas-SoftwareEngineer/claude-voice-interconnector $PLUGIN_E2E
   git clone "$PLUGIN_DEV" $PLUGIN_E2E
 }
 # Comprobación: el dist/ compilado existe (es lo que ejecutan los hooks).
@@ -389,15 +389,15 @@ git ls-remote --tags origin "v$V"
 ```powershell
 # 1. Resolución desde una máquina limpia.
 #    Comandos dentro de Claude Code:
-#      /plugin marketplace add CristianRojas-SoftwareEngineer/tts-sidecar-narrator
-#      /plugin install tts-sidecar-narrator@tts-sidecar-narrator
+#      /plugin marketplace add CristianRojas-SoftwareEngineer/claude-voice-interconnector
+#      /plugin install claude-voice-interconnector@claude-voice-interconnector
 
 # Comprobación: el tag está publicado.
-git ls-remote --tags https://github.com/CristianRojas-SoftwareEngineer/tts-sidecar-narrator "v$V"
+git ls-remote --tags https://github.com/CristianRojas-SoftwareEngineer/claude-voice-interconnector "v$V"
 
 # 2. Si el changelog del motor menciona el plugin, confirmar que el enlace
 #    apunta al tag correcto.
-Select-String -Path "$ENGINE_ROOT\CHANGELOG.md" -Pattern "tts-sidecar-narrator"
+Select-String -Path "$ENGINE_ROOT\CHANGELOG.md" -Pattern "claude-voice-interconnector"
 
 # 3. Actualizar ROADMAP.md con las direcciones cerradas y las que surjan
 #    de este release.

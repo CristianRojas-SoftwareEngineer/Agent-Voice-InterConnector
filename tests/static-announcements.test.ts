@@ -43,13 +43,13 @@ test("cada label cumple el contrato del motor: [a-z0-9._-]+", () => {
 test("cada anuncio tiene su slug semántico fijo y los seis son únicos", () => {
   assert.equal(
     ANNOUNCEMENTS.UserPromptSubmit.label,
-    "narrator-user-prompt-submit",
+    "voice-user-prompt-submit",
   );
-  assert.equal(ANNOUNCEMENTS.Stop.label, "narrator-stop");
-  assert.equal(ANNOUNCEMENTS.SubagentStop.label, "narrator-subagent-stop");
-  assert.equal(ANNOUNCEMENTS.StopFailure.label, "narrator-stop-failure");
-  assert.equal(ANNOUNCEMENTS.Notification.label, "narrator-notification");
-  assert.equal(ANNOUNCEMENTS.Default.label, "narrator-default");
+  assert.equal(ANNOUNCEMENTS.Stop.label, "voice-stop");
+  assert.equal(ANNOUNCEMENTS.SubagentStop.label, "voice-subagent-stop");
+  assert.equal(ANNOUNCEMENTS.StopFailure.label, "voice-stop-failure");
+  assert.equal(ANNOUNCEMENTS.Notification.label, "voice-notification");
+  assert.equal(ANNOUNCEMENTS.Default.label, "voice-default");
 
   const labels = new Set(Object.values(ANNOUNCEMENTS).map((a) => a.label));
   assert.equal(labels.size, 6);
