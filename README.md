@@ -12,144 +12,129 @@ Plugin de [Claude Code](https://code.claude.com) que **narra por voz** la activi
   free → OpenRouter `:free`) y degradan a un modo local determinista.
 - **Controlable**: activa/desactiva la narración sin desinstalar.
 
-> Este repositorio es la fuente de verdad del plugin. El documento de diseño
-> original (hoy consolidado en `AI-Voice-InterConnector/docs/DESIGN.md`, en el repo
-> del motor) sirvió de especificación inicial y hoy es solo un puntero histórico a este repo.
+---
 
-## Tabla de contenidos
-
-- [Prerequisitos](#prerequisitos)
-- [Instalación](#instalación)
-- [Configuración](#configuración)
-- [Privacidad](#privacidad)
-- [Desarrollo](#desarrollo)
-- [Documentación](#documentación)
-- [Licencia](#licencia)
-
-## Prerequisitos
-
-1. **AI Voice-InterConnector** instalado (instalador nativo por SO) y
-   aprovisionado — el plugin consume su grupo de comandos `speech`, definido en
-   el contrato de [`docs/INTEGRATION.md`](docs/INTEGRATION.md):
-   ```bash
-   ai-voice-interconnector setup
-   ```
-   El plugin lo verifica al iniciar la sesión (`SessionStart`) y te avisa si
-   falta el CLI o el modelo. El plugin **no** instala AI Voice-InterConnector;
-   está verificado contra AI Voice-InterConnector `v0.34.0`.
-2. _(Opcional)_ **API keys gratuitas** para mensajes generados por LLM:
-   - [Gemini API](https://ai.google.dev/) (free tier) — principal.
-   - [OpenRouter](https://openrouter.ai/) (modelos `:free`) — fallback.
-
-   Sin keys, el plugin funciona en modo **local** (determinista, 100 % offline).
-
-Node.js ya está presente por ser el runtime de Claude Code; los scripts se distribuyen compilados en `dist/`, así que **no hay `npm install` ni build** en tu máquina.
-
-## Instalación
-
-El flujo para el usuario final es de **dos pasos**:
-
-1. **Instalar el plugin** desde un marketplace (repo git), lo que persiste entre
-   sesiones:
-   ```
-   /plugin marketplace add CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector
-   /plugin install agent-voice-interconnector@Agent-Voice-InterConnector
-   ```
-2. **Instalar y configurar el motor** invocando el comando de instalación
-   guiado, que detecta el SO, instala el binario AI Voice-InterConnector
-   (instalador nativo por SO), descarga el modelo, deja el daemon listo,
-   pre-sintetiza los anuncios (`narrate-ctl presynth`) y activa la narración:
-   ```
-   /agent-voice-interconnector:install
-   ```
-
-Durante el desarrollo, el plugin se carga apuntando al directorio del repo (no persiste; hay que pasarlo en cada arranque):
+## Inicio rápido
 
 ```bash
-claude --plugin-dir .
+# 1. Instalar el plugin (persiste entre sesiones)
+/plugin marketplace add CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector
+/plugin install agent-voice-interconnector@Agent-Voice-InterConnector
+
+# 2. Instalar y configurar el motor (guiado, detecta SO, descarga modelo, pre-sintetiza)
+/agent-voice-interconnector:install
 ```
+
+El comando de instalación guía todo el proceso: detecta tu SO, instala el binario nativo, descarga los 5 modelos, levanta el daemon, pre-sintetiza los 6 anuncios estáticos y activa la narración.
+
+---
+
+## Cómo funciona
+
+El plugin se integra via **hooks de Claude Code** y consume la **CLI pública** de AI Voice-InterConnector (`ai-voice-interconnector` en el `PATH`). No hay código compartido ni dependencias de build.
+
+| Hook | Acción | Superficie CLI |
+|------|--------|----------------|
+| `UserPromptSubmit` | Acuse fijo «Procesando con Claude» | `speech play --label` |
+| `Stop` | Resumen del turno (local o LLM) | `speech say --daemon` |
+| `SubagentStop` / `StopFailure` / `Notification` | Avisos pre-sintetizados | `speech play --label` |
+| `SessionStart` | Health-check + daemon autostart | `doctor --json`, `daemon status --json`, `daemon start` |
+
+El modo `local` (por defecto) es 100 % offline y determinista. El modo `llm` (opt-in con API keys) parafrasea el último mensaje del asistente vía Gemini/OpenRouter.
+
+---
 
 ## Configuración
 
-### Ruta del estado
+### Estado (`config.json`)
 
-El estado vive en `config.json` dentro del _state dir_ por SO:
+Ubicación por SO:
 
-| SO      | Ruta                                                                       |
-| ------- | -------------------------------------------------------------------------- |
-| Windows | `%LOCALAPPDATA%\agent-voice-interconnector\config.json`                    |
-| Linux   | `${XDG_STATE_HOME:-~/.local/state}/agent-voice-interconnector/config.json` |
-| macOS   | `~/Library/Application Support/agent-voice-interconnector/config.json`     |
+| SO | Ruta |
+|----|------|
+| Windows | `%LOCALAPPDATA%\agent-voice-interconnector\config.json` |
+| Linux | `${XDG_STATE_HOME:-~/.local/state}/agent-voice-interconnector/config.json` |
+| macOS | `~/Library/Application Support/agent-voice-interconnector/config.json` |
 
-### Claves de API (modo `llm`)
+### Claves API (modo `llm`)
 
-La **ruta recomendada** para proveer las claves es la **variable de entorno**, que tiene precedencia sobre el archivo y evita persistir la credencial en disco:
+Preferencia: **variables de entorno** (prevalecen sobre archivo, no persisten en disco):
 
-- `GEMINI_API_KEY` (Gemini free tier, principal)
-- `OPENROUTER_API_KEY` (modelos `:free`, fallback)
+```bash
+export GEMINI_API_KEY=...      # principal
+export OPENROUTER_API_KEY=...  # fallback
+```
 
-Si prefieres persistencia en archivo —por ejemplo, cuando Claude Code se lanza desde un GUI y no hereda el entorno de tu shell— puedes añadir `"geminiApiKey"` y/o `"openRouterApiKey"` a `config.json`. Sin claves, el modo `llm` degrada a `local` de facto.
-
-### Preferencias (`config.json`)
+Alternativa: editar `config.json` (útil si Claude Code se lanza desde GUI):
 
 ```json
 {
   "enabled": true,
-  "messageMode": "llm"
+  "messageMode": "llm",
+  "geminiApiKey": "...",
+  "openRouterApiKey": "..."
 }
 ```
 
-- `enabled`: interruptor global de la narración.
-- `messageMode`: `"llm"` (cadena completa) o `"local"` (solo constructor
-  determinista, sin red). Sin ninguna key, `"llm"` degrada a `"local"` de facto.
+- `enabled`: interruptor global
+- `messageMode`: `"local"` (determinista, offline) o `"llm"` (parafraseo). Sin keys, `llm` → `local`.
 
-El archivo se crea con permisos restrictivos donde el SO lo soporta: `0600` en POSIX. En Windows ese bit es un no-op y la protección recae en las ACL del perfil sobre `%LOCALAPPDATA%`; el modelo de amenaza completo (qué se persiste, dónde y con qué permisos en cada SO) está en [SECURITY.md](SECURITY.md). La skill opcional (`/agent-voice-interconnector:narrate`) guía la configuración y expone los toggles.
+Ver modelo de amenazas completo en [SECURITY.md](SECURITY.md). La skill `/agent-voice-interconnector:narrate` expone toggles interactivos.
+
+---
 
 ## Privacidad
 
-El modo `llm` envía el último mensaje del asistente (`last_assistant_message`, sin transcript ni historial) a un tercero (Google u OpenRouter), y solo en la ruta `Stop`: el resto de eventos siempre reproduce su anuncio pre-sintetizado, sin red. Es un cambio de postura respecto al motor AI Voice-InterConnector, que sintetiza 100 % offline. Por eso:
+- **Modo `local`**: cero red, 100 % offline, mensajes simples.
+- **Modo `llm`**: solo en evento `Stop` envía `last_assistant_message` (sin transcript ni historial) a Google/OpenRouter. Opt-in explícito: requiere configurar tus claves.
+- El resto de hooks (`UserPromptSubmit`, `SubagentStop`, `StopFailure`, `Notification`) **nunca** usan red: reproducen avisos pre-sintetizados locales.
 
-1. El modo `llm` **solo se activa cuando configuras tus claves** — un opt-in
-   explícito.
-2. `messageMode: "local"` ofrece la experiencia completa sin que ningún dato
-   salga de tu máquina (mensajes menos elaborados).
+---
 
 ## Desarrollo
 
 ```bash
-npm install       # solo para desarrollo (typescript, esbuild)
-npm run typecheck # verificación de tipos
-npm run build     # compila src/ → dist/ (commitear dist/)
-npm run check-dist # verifica que dist/ está sincronizado con src/
-npm test          # suite de tests (node --test, sin framework externo)
+npm install        # dependencias de dev (typescript, esbuild)
+npm run typecheck  # verificación de tipos
+npm run build      # compila src/ → dist/ (commitear dist/)
+npm run check-dist # verifica dist/ sincronizado con src/
+npm test           # suite (node --test, sin framework externo)
 ```
 
-El nombre del plugin es su identidad pública (`/plugin install agent-voice-interconnector@Agent-Voice-InterConnector` y el namespace `/agent-voice-interconnector:*`), y hay reglas que el CLI de Claude Code aplica sobre él: no puede empezar por `claude-` (Anthropic reserva ese prefijo) ni llevar mayúsculas (el marketplace de Claude.ai exige kebab-case). Para comprobarlo localmente:
+### Reglas del nombre del plugin
+
+- Identidad pública: `agent-voice-interconnector@Agent-Voice-InterConnector`
+- Namespace: `/agent-voice-interconnector:*`
+- No puede empezar por `claude-` (reservado por Anthropic)
+- Debe ser kebab-case (requisito marketplace Claude.ai)
+
+Validación local (mismo gate que CI):
 
 ```bash
 claude plugin validate --strict .
 ```
 
-Es el mismo gate que corre el CI, y no necesita credenciales ni conexión: solo analiza los manifiestos del repo.
+### Distribución
 
 `dist/` **se commitea**: los plugins se instalan clonando el repo, así que el JS compilado debe estar en el árbol para que los hooks funcionen sin paso de build.
 
-El CI (CircleCI, [.circleci/config.yml](.circleci/config.yml)) corre `typecheck`, `npm run build` y la suite de tests en Linux, Windows y macOS en cada push — el mismo proveedor y nomenclatura de jobs que usa el motor. Además, el job `validate-manifest` valida los manifiestos del plugin con `claude plugin validate --strict`, que es lo único que detecta un nombre de plugin inválido (reservado por Anthropic o no kebab-case): typecheck, build y tests nunca miran `.claude-plugin/`.
+### CI
+
+CircleCI (`.circleci/config.yml`): `typecheck`, `build`, `test` en Linux/Windows/macOS + `validate-manifest` (nombre del plugin).
+
+---
 
 ## Documentación
 
-- [`docs/INTEGRATION.md`](docs/INTEGRATION.md) — integración con el motor
-  AI Voice-InterConnector desde la perspectiva del plugin: contrato del CLI, uso por cada
-  hook, requisitos y degradación. Su contraparte, desde la perspectiva del
-  motor, está en
-  [AI-Voice-InterConnector/docs/CLI/CONTRACT.md §12](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/v0.34.0/docs/CLI/CONTRACT.md#12-contratos-externos).
-- [`docs/RELEASING.md`](docs/RELEASING.md) — proceso de release del plugin y
-  su sincronización con los releases del motor.
-- [`SECURITY.md`](SECURITY.md) — política de seguridad y modelo de amenaza del
-  plugin (credenciales, modo `llm`, cadena de suministro).
-- [`CHANGELOG.md`](CHANGELOG.md) — cambios notables por versión.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — direcciones futuras del plugin y
-  registro histórico del release v0.1.0.
+- [`docs/INTEGRATION.md`](docs/INTEGRATION.md) — contrato CLI, hooks, requisitos, degradación (perspectiva plugin).
+- [`docs/RELEASING.md`](docs/RELEASING.md) — proceso de release y sincronización con motor.
+- [`SECURITY.md`](SECURITY.md) — política de seguridad, modelo de amenazas, credenciales.
+- [`CHANGELOG.md`](CHANGELOG.md) — cambios por versión.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — direcciones futuras e histórico v0.1.0.
+
+Contraparte del motor: [AI-Voice-InterConnector/docs/CLI/CONTRACT.md §12](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/docs/CLI/CONTRACT.md#12-contratos-externos).
+
+---
 
 ## Licencia
 

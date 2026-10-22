@@ -6,7 +6,7 @@
 
 // Hook de SessionStart (dist/health-check.js) como subproceso real, con un CLI
 // `ai-voice-interconnector` falso en el PATH parametrizado por caso: `doctor
-// --json` con su exit y payload (contrato v0.34.0: reporte con failed/checks o
+// --json` con su exit y payload (contrato v0.36.2: reporte con failed/checks o
 // objeto de error), y `daemon status --json` con su exit y payload (running/
 // stopped/degraded o basura). Fija por contrato el flujo nuevo: consultar el
 // daemon solo tras diagnóstico sano, arrancarlo a lo sumo una vez y solo con
@@ -164,11 +164,11 @@ function startCount(argvLog: string): number {
   ).length;
 }
 
-/** Reporte sano del contrato v0.34.0: failed vacío y checks correctos. */
+/** Reporte sano del contrato v0.36.2: failed vacío y checks correctos. */
 function healthyDoctorJson(): string {
   return JSON.stringify({
     schema_version: "5",
-    version: "0.34.0",
+    version: "0.36.2",
     failed: [],
     checks: [{ name: "install_receipt", ok: true, detail: "recibo válido" }],
     models: { missing: [] },

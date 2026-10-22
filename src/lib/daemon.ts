@@ -7,8 +7,8 @@
 // Consulta y arranque del daemon de AI Voice-InterConnector vía su CLI pública. El daemon
 // mantiene el modelo en memoria: `speech say --daemon` lo requiere corriendo (no
 // lo arranca solo). El health-check lo levanta de forma desanclada al iniciar
-// sesión. El estado sale de `daemon status --json` (contrato v0.34.0: clave
-// `daemon` como cadena, `degraded` y `warm` opcionales, siempre exit 0).
+// sesión. El estado sale de `daemon status --json` (contrato v0.36.2: clave
+// `daemon` como cadena, `degraded` y `warm` opcionales; exit 0, 1 (`daemon_error`) o 5 (`daemon_unreachable`)).
 import { runCli, spawnCli } from "./resolve-cli.js";
 
 export interface DaemonStatusResult {
@@ -34,10 +34,10 @@ function normalizeDegraded(value: unknown): DaemonStatusResult["degraded"] {
 }
 
 /**
- * Estado del daemon según el contrato v0.34.0. La única rama que significa
+ * Estado del daemon según el contrato v0.36.2. La única rama que significa
  * «en ejecución» es `daemon: "running"` con exit 0; el esquema antiguo
  * `{"running": true}` (booleano), el JSON malformado, la salida vacía, un exit
- * distinto de 0 o un estado desconocido devuelven `incierto` —nunca running—.
+ * distinto de 0 (1 `daemon_error` o 5 `daemon_unreachable`) o un estado desconocido devuelven `incierto` —nunca running—.
  * Conserva exit y JSON crudo para que el health-check pueda diagnosticar sin
  * re-ejecutar el CLI.
  */
@@ -69,7 +69,7 @@ export function getDaemonStatus(cliPath: string): DaemonStatusResult {
   } catch {
     return { kind: "incierto", exitCode };
   }
-  // El contrato fija exit 0 siempre: un exit distinto con JSON es incoherente.
+  // El contrato admite 0, 1 (`daemon_error`) y 5 (`daemon_unreachable`); cualquier exit distinto de 0 se trata como incierto.
   if (exitCode !== 0) {
     return { kind: "incierto", exitCode, raw: parsed };
   }

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// Decisión pura del health-check contra el contrato v0.34.0 de `doctor --json`
+// Decisión pura del health-check contra el contrato v0.36.2 de `doctor --json`
 // (DOCTOR.md del tag): emite exactamente un objeto con `failed: string[]` y
 // `checks: {name, ok, detail}[]`; el veredicto sale del exit más el reporte
 // válido, nunca de un campo `status` que el motor no emite. La entrada de la
@@ -17,11 +17,11 @@ import {
   NOT_PROVISIONED_MESSAGE,
 } from "../src/lib/health-decision.js";
 
-/** Reporte mínimo del contrato v0.34.0 (shape congelado desde DOCTOR.md). */
+/** Reporte mínimo del contrato v0.36.2 (shape congelado desde DOCTOR.md). */
 function healthyReport() {
   return {
     schema_version: "5",
-    version: "0.34.0",
+    version: "0.36.2",
     failed: [],
     checks: [
       { name: "install_receipt", ok: true, detail: "recibo válido" },

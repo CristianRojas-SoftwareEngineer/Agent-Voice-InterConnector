@@ -98,7 +98,7 @@ En orden; cada paso asume el anterior.
 
 ## Sincronización con un release del motor
 
-Cuando el release del plugin acompaña a un release del motor (como el primer lanzamiento público conjunto), el orden importa — **primero el motor, después el plugin**:
+Cuando el release del plugin acompaña a un release del motor, el orden importa — **primero el motor, después el plugin**:
 
 1. El motor corta su tag; su pipeline de CircleCI construye y publica los
    artefactos (binarios nativos por plataforma) automáticamente.
@@ -226,9 +226,9 @@ if (-not $ok) { throw "doctor no está sano (failed: $($doctor.failed -join ', '
 ```powershell
 ai-voice-interconnector daemon start
 # Comprobación: el daemon queda running. La clave es la cadena "daemon"; no
-# existe el booleano "running". Nota: daemon status termina SIEMPRE con exit 0
-# (también con "stopped" o "degraded"), así que "stopped" con exit 0 es un
-# estado válido, no un error.
+# existe el booleano "running". Nota: daemon status sale 0 en el caso normal;
+# 1 (`daemon_error`) o 5 (`daemon_unreachable`) si el sondeo de salud falla.
+# Un "stopped" o "degraded" con exit 0 es un estado válido, no un error.
 ai-voice-interconnector daemon status --json | ConvertFrom-Json | ForEach-Object { $_.daemon -eq "running" }
 #     Debe imprimir: True
 ```
@@ -262,7 +262,7 @@ Valida el pipeline TTS + daemon de forma aislada. No requiere claves.
 narrate-ctl on                        # activa la narración
 narrate-ctl mode local                # modo local (determinista, offline)
 narrate-ctl status                    # enabled: true, messageMode: local
-# La clave es la cadena "daemon"; "stopped" con exit 0 no es error (ver paso 2).
+# La clave es la cadena "daemon"; "stopped" con exit 0 no es error; un exit 1/5 sí lo es: el sondeo falló (ver paso 2).
 ai-voice-interconnector daemon status --json | ConvertFrom-Json | ForEach-Object { $_.daemon -eq "running" }
 narrate-ctl say "Prueba de audio local"
 # Comprobación AUDIBLE: se escucha la frase en español.
@@ -408,7 +408,7 @@ git ls-remote --tags https://github.com/CristianRojas-SoftwareEngineer/Agent-Voi
 
 # 2. Si el changelog del motor menciona el plugin, confirmar que el enlace
 #    apunta al tag correcto.
-Select-String -Path "$ENGINE_ROOT\CHANGELOG.md" -Pattern "Agent-Voice-InterConnector"
+Select-String -Path "$ENGINE_ROOT\CHANGELOG.md" -Pattern "Agent[ -]Voice-InterConnector"
 
 # 3. Actualizar ROADMAP.md con las direcciones cerradas y las que surjan
 #    de este release.

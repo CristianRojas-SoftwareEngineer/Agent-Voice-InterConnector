@@ -47,21 +47,20 @@ Resume al usuario en una frase qué encontraste y qué vas a hacer.
 
 ## Paso 1 — Instalar el binario AI Voice-InterConnector (instalador nativo por SO)
 
-Usa el instalador nativo que corresponde al SO. La release `v0.34.0` publica dos
-assets: `install.sh` (Linux y macOS) e `install.ps1` (Windows). Cada uno descarga
+Usa el instalador nativo que corresponde al SO. La release actual publica los instaladores `install.sh` (Linux y macOS) e `install.ps1` (Windows), además de los binarios por plataforma y `SHA256SUMS.txt`. Cada uno descarga
 el binario, lo agrega al PATH del usuario (sin `sudo`) y encadena `setup`
 automáticamente:
 
 - **Linux** y **macOS**:
 
   ```bash
-  curl -fsSL https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/releases/download/v0.34.0/install.sh | sh
+  curl -fsSL https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/releases/latest/download/install.sh | sh
   ```
 
 - **Windows** (PowerShell):
 
   ```powershell
-  irm https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/releases/download/v0.34.0/install.ps1 | iex
+  irm https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/releases/latest/download/install.ps1 | iex
   ```
 
 Tras instalar por cualquier vía, **verifica**: `ai-voice-interconnector version`. Si el comando no se encuentra, probablemente el PATH aún no se recargó: indica al usuario abrir una terminal nueva (o reiniciar Claude Code) y reanuda.

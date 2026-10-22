@@ -4,7 +4,7 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// Decisión pura del hook de SessionStart contra el contrato v0.34.0 de
+// Decisión pura del hook de SessionStart contra el contrato v0.36.2 de
 // `doctor --json` (DOCTOR.md del tag del motor): el comando emite exactamente
 // un objeto JSON con `failed: string[]` y `checks: {name, ok, detail}[]`, y el
 // veredicto sale del exit más el reporte válido —nunca de un campo `status`
@@ -85,7 +85,7 @@ export function parseFirstJsonObject(text: string): unknown {
   return undefined;
 }
 
-/** ¿El valor parseado tiene el shape mínimo del reporte v0.34.0? */
+/** ¿El valor parseado tiene el shape mínimo del reporte v0.36.2? */
 function isValidReport(value: unknown): value is DoctorReport {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;

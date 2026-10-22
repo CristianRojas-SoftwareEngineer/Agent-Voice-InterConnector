@@ -8,7 +8,7 @@
 // narración está completa (CLI en PATH + diagnóstico sano) y, solo en ese caso,
 // deja el daemon en marcha para que `speech say --daemon` esté caliente durante
 // la sesión (elimina el arranque manual tras un reinicio). El veredicto sale
-// del exit de `doctor --json` más su reporte (failed/checks, contrato v0.34.0);
+// del exit de `doctor --json` más su reporte (failed/checks, contrato v0.36.2);
 // ante un check fallido o un estado degradado/incierto del daemon avisa al
 // usuario con el campo systemMessage del JSON de salida (único mecanismo de
 // aviso portable). Nunca falla la sesión: exit 0 siempre.

@@ -4,10 +4,10 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// `daemon status --json` contra el contrato v0.34.0 (DAEMON.md del tag): clave
+// `daemon status --json` contra el contrato v0.36.2 (CONTRACT.md tabla por comando): clave
 // `daemon` como cadena ("running"|"stopped"), `degraded` opcional
 // (unresponsive|unregistered|orphan_resident) y `warm` opcional
-// (warming|warm|warm_failed); siempre exit 0. getDaemonStatus devuelve un
+// (warming|warm|warm_failed); exit 0, 1 (`daemon_error`) o 5 (`daemon_unreachable`). getDaemonStatus devuelve un
 // resultado discriminado (running|stopped|degraded|incierto) que conserva exit
 // y JSON, y el esquema antiguo {"running": true} (booleano) se trata como
 // incierto, nunca como «running». Usa un shim `ai-voice-interconnector` falso

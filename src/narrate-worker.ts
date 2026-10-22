@@ -118,7 +118,7 @@ function runPlay(cliPath: string, label: string): Promise<void> {
       if (code !== 0) {
         const hint =
           code === 3
-            ? " (anuncio no pre-sintetizado; ejecuta narrate-ctl presynth)"
+            ? " (locución o voz no disponible; ejecuta narrate-ctl presynth)"
             : "";
         log(`speech play salió con código ${code}${hint}`);
       }
