@@ -53,10 +53,9 @@ medidos aún (se determinarán con uso real):
   autocontenido. Su costo es acotado y no depende del tamaño del transcript. Si
   una iteración futura reintroduce contexto al LLM, volvería a aplicar el punto
   sobre cachear/limitar la cola.
-- **Cadena de providers:** hoy los dos providers de la cadena (`gemini` y
-  `openrouter`) se intentan en secuencia; `local` no es un provider sino la
-  rama de degradación, que vive fuera de la cadena. Un timeout temprano en los
-  providers externos aceleraría la caída a `local` cuando no hay conectividad.
+- **Proveedor LLM:** la ruta `llm` llama directamente a Gemini; `local` no es
+  un provider sino la rama de degradación, que vive fuera de la llamada. Un
+  timeout temprano aceleraría la caída a `local` cuando no hay conectividad.
 - **Worker de narración:** el worker actual se lanza, espera, sintetiza y
   muere por hook; un worker persistente (ver cola FIFO arriba) eliminaría el
   costo de levantar el subproceso en cada llamada.
@@ -101,30 +100,27 @@ que haya alcanzado hasta ese momento directamente a `1.0.0`, en un release
 que acumule las correcciones implementadas hasta entonces. Ese salto está
 registrado en el `CHANGELOG.md` para que no parezca un error de versionado.
 
-## Gestión de API keys — nota de transparencia
+## Gestión de la clave de API — nota de transparencia
 
 El diseño actual sigue buenas prácticas y **no requiere `.env`/`.env.example`**:
 el plugin se distribuye clonando el repo (`dist/` commiteado), así que un
 `.env` en la raíz viviría dentro del árbol compartido por todos los usuarios
 del clon y se pisaría en cada actualización — el lugar correcto para el
-secreto de cada usuario es fuera del repo, igual que AI Voice-InterConnector resuelve su
-`data_root()`.
+secreto de cada usuario es fuera del repo, en el entorno del proceso.
 
 Resumen del diseño (`src/lib/config.ts`, `src/lib/state-dir.ts`):
 
-- Las claves se leen con precedencia **variable de entorno > `config.json` en
-  el state dir por SO > sin configurar** (degrada a modo `local`).
+- La API key se lee únicamente de la variable de entorno `GEMINI_API_KEY`.
+  Sin clave, el modo `llm` degrada a `local`.
+- `config.json` guarda solo preferencias no secretas (`enabled` y
+  `messageMode`); nunca contiene claves.
 - `config.json` nunca vive en el repo; se crea en tiempo de ejecución en
   `%LOCALAPPDATA%\agent-voice-interconnector` (Windows), `~/.local/state/agent-voice-interconnector`
   (Linux) o `~/Library/Application Support/agent-voice-interconnector` (macOS).
-- El archivo se escribe con permisos `0600` en POSIX. En Windows la protección
-  depende de las ACL del perfil sobre `%LOCALAPPDATA%` (documentado en
-  `SECURITY.md`).
 - Ninguna skill ni comando pide o maneja la clave dentro del chat (evita que
-  quede en el transcript); ambas guían al usuario a variable de entorno o
-  edición directa del archivo.
+  quede en el transcript); ambos guían al usuario a la variable de entorno.
 - `narrate-ctl.js status` nunca imprime el valor de la clave, solo si está
-  configurada.
+  configurada en el entorno.
 
 ## Apéndice: histórico del release v0.1.0
 

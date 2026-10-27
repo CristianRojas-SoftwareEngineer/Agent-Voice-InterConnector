@@ -4,8 +4,9 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// Lee y escribe config.json en el state dir. Las variables de entorno
-// GEMINI_API_KEY / OPENROUTER_API_KEY tienen precedencia sobre el archivo.
+// Lee y escribe config.json en el state dir. El archivo solo guarda preferencias
+// no secretas (enabled y messageMode). La API key se lee únicamente de la
+// variable de entorno GEMINI_API_KEY y nunca se persiste en disco.
 import { readFileSync, writeFileSync } from "node:fs";
 import { configPath, ensureStateDir } from "./state-dir.js";
 
@@ -14,21 +15,29 @@ export type MessageMode = "llm" | "local";
 export interface Config {
   enabled: boolean;
   messageMode: MessageMode;
+  /** Campo de tiempo de ejecución: proviene solo de GEMINI_API_KEY. */
   geminiApiKey?: string;
-  openRouterApiKey?: string;
+}
+
+interface FileConfig {
+  enabled?: boolean;
+  messageMode?: MessageMode;
 }
 
 const DEFAULTS: Config = {
   enabled: true,
-  messageMode: "llm",
+  messageMode: "local",
 };
 
-function readFileConfig(): Partial<Config> {
+function readFileConfig(): FileConfig {
   try {
     const raw = readFileSync(configPath(), "utf8");
     const parsed = JSON.parse(raw) as unknown;
     if (parsed && typeof parsed === "object") {
-      return parsed as Partial<Config>;
+      // Solo se conservan preferencias no secretas; cualquier campo de clave
+      // presente en un archivo antiguo se ignora.
+      const { enabled, messageMode } = parsed as FileConfig;
+      return { enabled, messageMode };
     }
   } catch {
     // Sin archivo o JSON inválido: se usan defaults.
@@ -37,37 +46,41 @@ function readFileConfig(): Partial<Config> {
 }
 
 /**
- * Config efectiva: defaults ← archivo ← variables de entorno (mayor precedencia).
+ * Config efectiva: defaults ← archivo ← variable de entorno (mayor precedencia).
  * Nunca lanza; ante cualquier problema devuelve al menos los defaults.
+ * La API key solo se lee del entorno; nunca del archivo.
  */
 export function loadConfig(): Config {
   const file = readFileConfig();
-  const cfg: Config = {
+  return {
     enabled:
       typeof file.enabled === "boolean" ? file.enabled : DEFAULTS.enabled,
-    messageMode: file.messageMode === "local" ? "local" : DEFAULTS.messageMode,
-    geminiApiKey: emptyToUndef(file.geminiApiKey),
-    openRouterApiKey: emptyToUndef(file.openRouterApiKey),
+    messageMode: file.messageMode === "llm" ? "llm" : DEFAULTS.messageMode,
+    geminiApiKey: emptyToUndef(process.env.GEMINI_API_KEY),
   };
-
-  const envGemini = emptyToUndef(process.env.GEMINI_API_KEY);
-  const envOpenRouter = emptyToUndef(process.env.OPENROUTER_API_KEY);
-  if (envGemini) cfg.geminiApiKey = envGemini;
-  if (envOpenRouter) cfg.openRouterApiKey = envOpenRouter;
-
-  return cfg;
 }
 
 /**
- * Mezcla cambios parciales sobre la config del archivo y persiste con permisos
- * restrictivos (0600 en POSIX; no-op efectivo en Windows — ver SECURITY.md,
- * modelo de amenaza). Usado por la skill.
+ * Persiste preferencias no secretas sobre la config del archivo con permisos
+ * restrictivos (0600 en POSIX; no-op efectivo en Windows). Nunca escribe
+ * campos de clave. Usado por la skill.
  */
-export function updateConfig(patch: Partial<Config>): Config {
+export function updateConfig(
+  patch: Partial<Pick<Config, "enabled" | "messageMode">>,
+): Config {
   ensureStateDir();
   const current = readFileConfig();
-  const merged: Partial<Config> = { ...current, ...patch };
-  writeFileSync(configPath(), JSON.stringify(merged, null, 2) + "\n", {
+  const next = {
+    enabled:
+      patch.enabled ??
+      (typeof current.enabled === "boolean"
+        ? current.enabled
+        : DEFAULTS.enabled),
+    messageMode:
+      patch.messageMode ??
+      (current.messageMode === "llm" ? "llm" : DEFAULTS.messageMode),
+  };
+  writeFileSync(configPath(), JSON.stringify(next, null, 2) + "\n", {
     mode: 0o600,
   });
   return loadConfig();

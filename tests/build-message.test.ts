@@ -27,14 +27,12 @@ const LOCAL: Config = {
   enabled: true,
   messageMode: "local",
   geminiApiKey: undefined,
-  openRouterApiKey: undefined,
 };
 
 const LLM: Config = {
   enabled: true,
   messageMode: "llm",
   geminiApiKey: "dummy",
-  openRouterApiKey: undefined,
 };
 
 // --- Enrutado de eventos con anuncio fijo (`play`), sin LLM ---
@@ -318,6 +316,18 @@ test("Stop (llm) con LLM caído degrada al resumen local acotado (clampSentences
   } finally {
     restoreEnv();
   }
+});
+
+test("Stop (llm) sin API key degrada al resumen local sin invocar la red", async () => {
+  const out = await buildMessage(
+    {
+      hook_event_name: "Stop",
+      last_assistant_message: "Trabajo completado.",
+    },
+    { ...LLM, geminiApiKey: undefined },
+  );
+  assert.deepEqual(out, { kind: "say", text: "Trabajo completado." });
+  assert.equal(lastBody, undefined);
 });
 
 test("Stop (llm) con LLM caído degrada a las dos primeras oraciones del turno", async () => {

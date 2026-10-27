@@ -11,21 +11,17 @@
 // ÚNICAMENTE `last_assistant_message` — ni transcript ni historial. El resto de
 // eventos (`Notification`, `SubagentStop`, `StopFailure`, `UserPromptSubmit`)
 // reproduce su anuncio pre-sintetizado (`play`), sin LLM ni síntesis por evento.
-// Degradación de la ruta `Stop`: cadena LLM (input acotado con clampHead) →
+// Degradación de la ruta `Stop`: Gemini (input acotado con clampHead) →
 // resumen local determinista (`clampSentences`: hasta
 // `LOCAL_SPEECH_MAX_SENTENCES` oraciones, con `LOCAL_SPEECH_MAX_CHARS` como freno
-// de emergencia) → anuncio estático por evento. El sano descarta el cuerpo de
-// los bloques de código cercados, así que una respuesta que solo sea código no
-// entra en ninguna ruta dinámica.
+// de emergencia) → anuncio estático por evento. Único proveedor, sin fallback
+// de proveedor: cualquier fallo de Gemini cae directamente al resumen local.
+// El sano descarta el cuerpo de los bloques de código cercados, así que una
+// respuesta que solo sea código no entra en ninguna ruta dinámica.
 import type { Config } from "../lib/config.js";
 import type { HookPayload } from "../lib/hook-payload.js";
-import {
-  runChain,
-  type GenerationInput,
-  type TextProvider,
-} from "./provider-chain.js";
+import type { GenerationInput } from "./provider.js";
 import { GeminiProvider } from "./gemini-provider.js";
-import { OpenRouterProvider } from "./openrouter-provider.js";
 import {
   ANNOUNCEMENTS,
   type NarrationRequest,
@@ -73,15 +69,16 @@ export async function buildMessage(
     return { kind: "play", label: fallback.label };
   }
 
-  if (cfg.messageMode === "llm") {
-    const providers = buildProviders(cfg);
-    if (providers.length > 0) {
+  if (cfg.messageMode === "llm" && cfg.geminiApiKey) {
+    try {
       const input: GenerationInput = { text: clampHead(raw) };
-      const llm = await runChain(providers, input);
-      if (llm) {
-        const clean = sanitizeForSpeech(llm);
-        if (clean) return { kind: "say", text: clean };
-      }
+      const llm = (
+        await new GeminiProvider(cfg.geminiApiKey).generate(input)
+      ).trim();
+      const clean = sanitizeForSpeech(llm);
+      if (clean) return { kind: "say", text: clean };
+    } catch {
+      // Sin key, error HTTP o timeout: se degrada al resumen local de abajo.
     }
   }
 
@@ -97,13 +94,4 @@ export async function buildMessage(
       LOCAL_SPEECH_MAX_SENTENCES,
     ),
   };
-}
-
-/** Providers en orden de prioridad; se omite el que no tenga key. */
-function buildProviders(cfg: Config): TextProvider[] {
-  const providers: TextProvider[] = [];
-  if (cfg.geminiApiKey) providers.push(new GeminiProvider(cfg.geminiApiKey));
-  if (cfg.openRouterApiKey)
-    providers.push(new OpenRouterProvider(cfg.openRouterApiKey));
-  return providers;
 }

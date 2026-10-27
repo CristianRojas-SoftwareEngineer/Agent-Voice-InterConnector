@@ -5,7 +5,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 // Superficie de control de la narración (para la skill opcional y uso manual).
-// Escribe/lee config.json en el state dir. No participa en el flujo de hooks.
+// Lee y escribe config.json en el state dir: solo preferencias no secretas
+// (enabled y messageMode). La API key se lee del entorno. No participa en el
+// flujo de hooks.
 //
 // Uso: node dist/narrate-ctl.js <comando> [args]
 //   on                 activa la narración
@@ -25,7 +27,6 @@ function printStatus(): void {
     `enabled:      ${cfg.enabled}`,
     `messageMode:  ${cfg.messageMode}`,
     `gemini key:   ${cfg.geminiApiKey ? "configurada" : "ausente"}`,
-    `openrouter:   ${cfg.openRouterApiKey ? "configurada" : "ausente"}`,
     `config:       ${configPath()}`,
     `state dir:    ${stateDir()}`,
   ];

@@ -43,14 +43,15 @@ function payloadPath() {
 // src/lib/config.ts
 var DEFAULTS = {
   enabled: true,
-  messageMode: "llm"
+  messageMode: "local"
 };
 function readFileConfig() {
   try {
     const raw = readFileSync(configPath(), "utf8");
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
-      return parsed;
+      const { enabled, messageMode } = parsed;
+      return { enabled, messageMode };
     }
   } catch {
   }
@@ -58,17 +59,11 @@ function readFileConfig() {
 }
 function loadConfig() {
   const file = readFileConfig();
-  const cfg = {
+  return {
     enabled: typeof file.enabled === "boolean" ? file.enabled : DEFAULTS.enabled,
-    messageMode: file.messageMode === "local" ? "local" : DEFAULTS.messageMode,
-    geminiApiKey: emptyToUndef(file.geminiApiKey),
-    openRouterApiKey: emptyToUndef(file.openRouterApiKey)
+    messageMode: file.messageMode === "llm" ? "llm" : DEFAULTS.messageMode,
+    geminiApiKey: emptyToUndef(process.env.GEMINI_API_KEY)
   };
-  const envGemini = emptyToUndef(process.env.GEMINI_API_KEY);
-  const envOpenRouter = emptyToUndef(process.env.OPENROUTER_API_KEY);
-  if (envGemini) cfg.geminiApiKey = envGemini;
-  if (envOpenRouter) cfg.openRouterApiKey = envOpenRouter;
-  return cfg;
 }
 function emptyToUndef(v) {
   return typeof v === "string" && v.trim() !== "" ? v : void 0;

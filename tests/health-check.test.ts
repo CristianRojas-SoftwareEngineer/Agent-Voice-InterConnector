@@ -35,7 +35,6 @@ afterEach(() => {
 function healthEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.GEMINI_API_KEY;
-  delete env.OPENROUTER_API_KEY;
   Object.assign(env, extra);
   if (process.platform === "win32") env.LOCALAPPDATA = stateBase;
   else if (process.platform === "darwin") env.HOME = stateBase;

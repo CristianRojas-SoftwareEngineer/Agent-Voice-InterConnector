@@ -34,7 +34,6 @@ afterEach(() => {
 function ctlEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.GEMINI_API_KEY;
-  delete env.OPENROUTER_API_KEY;
   Object.assign(env, extra);
   if (process.platform === "win32") env.LOCALAPPDATA = stateBase;
   else if (process.platform === "darwin") env.HOME = stateBase;
@@ -96,11 +95,28 @@ test("status reporta el estado y jamás imprime el valor de una clave", () => {
   const res = runCtl(["status"], { GEMINI_API_KEY: sentinel });
   assert.equal(res.status, 0);
   assert.match(res.stdout, /enabled:/);
-  assert.match(res.stdout, /messageMode:/);
+  assert.match(res.stdout, /messageMode: {2}local/);
   assert.match(res.stdout, /gemini key: {3}configurada/);
-  assert.match(res.stdout, /openrouter: {3}ausente/);
+  assert.ok(!/openrouter/i.test(res.stdout));
   assert.ok(!res.stdout.includes(sentinel));
   assert.ok(!res.stderr.includes(sentinel));
+});
+
+test("status sin GEMINI_API_KEY reporta la clave ausente", () => {
+  const res = runCtl(["status"]);
+  assert.equal(res.status, 0);
+  assert.match(res.stdout, /messageMode: {2}local/);
+  assert.match(res.stdout, /gemini key: {3}ausente/);
+});
+
+test("config.json solo persiste preferencias no secretas", () => {
+  assert.equal(runCtl(["on"]).status, 0);
+  assert.equal(runCtl(["mode", "llm"]).status, 0);
+  assert.equal(runCtl(["off"]).status, 0);
+  const raw = readConfigFile();
+  assert.deepEqual(Object.keys(raw).sort(), ["enabled", "messageMode"]);
+  assert.equal(raw.enabled, false);
+  assert.equal(raw.messageMode, "llm");
 });
 
 test("sin comando equivale a status", () => {

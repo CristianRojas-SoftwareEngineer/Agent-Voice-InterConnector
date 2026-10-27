@@ -4,14 +4,13 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// Tests de contrato de los adaptadores Gemini/OpenRouter con fetch mockeado:
-// serialización del mensaje único, parseo de la respuesta, HTTP no-ok y
-// respuesta vacía. Nunca tocan la red.
+// Tests de contrato del proveedor Gemini con fetch mockeado: serialización del
+// mensaje único, parseo de la respuesta, HTTP no-ok y respuesta vacía. Nunca
+// tocan la red.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { GeminiProvider } from "../src/message/gemini-provider.js";
-import { OpenRouterProvider } from "../src/message/openrouter-provider.js";
-import type { GenerationInput } from "../src/message/provider-chain.js";
+import type { GenerationInput } from "../src/message/provider.js";
 import { SUMMARY_CLOSING } from "../src/message/prompts.js";
 
 const INPUT: GenerationInput = { text: "Terminé la tarea." };
@@ -95,73 +94,6 @@ test("Gemini: lanza sin llamar a fetch si no hay API key", async () => {
   mockFetch(200, {});
   await assert.rejects(
     () => new GeminiProvider("").generate(INPUT),
-    /sin API key/,
-  );
-  assert.equal(lastRequest, undefined);
-});
-
-// --- OpenRouter (formato Anthropic Messages) ---
-
-test("OpenRouter: usa el modelo :free configurado y el endpoint /api/v1/messages", async () => {
-  mockFetch(200, { content: [{ type: "text", text: "ok" }] });
-  await new OpenRouterProvider("clave").generate(INPUT);
-  assert.ok(lastRequest?.url.includes("openrouter.ai"));
-  assert.ok(lastRequest?.url.includes("/api/v1/messages"));
-  const body = JSON.parse(lastRequest!.init.body as string);
-  assert.equal(body.model, "poolside/laguna-xs-2.1:free");
-});
-
-test("OpenRouter: manda system + el único mensaje user (formato Anthropic), no chat/completions", async () => {
-  mockFetch(200, { content: [{ type: "text", text: "ok" }] });
-  await new OpenRouterProvider("clave").generate(INPUT);
-  const body = JSON.parse(lastRequest!.init.body as string);
-  assert.ok(body.system.includes("No inventes"));
-  assert.ok(Array.isArray(body.messages));
-  assert.equal(body.messages.length, 1);
-  assert.equal(body.messages[0].role, "user");
-  assert.equal(body.messages[0].content, EXPECTED_CONTENT);
-  assert.ok(!("choices" in body));
-});
-
-test("OpenRouter: extrae el content tipo texto de la respuesta", async () => {
-  mockFetch(200, {
-    content: [
-      { type: "text", text: "  Texto narrado  " },
-      { type: "other", text: "ignorado" },
-    ],
-  });
-  const text = await new OpenRouterProvider("clave").generate(INPUT);
-  assert.equal(text, "Texto narrado");
-});
-
-test("OpenRouter: manda la clave como Bearer, nunca en la URL", async () => {
-  mockFetch(200, { content: [{ type: "text", text: "ok" }] });
-  await new OpenRouterProvider("clave-secreta").generate(INPUT);
-  const headers = lastRequest?.init.headers as Record<string, string>;
-  assert.equal(headers["authorization"], "Bearer clave-secreta");
-  assert.ok(!lastRequest?.url.includes("clave-secreta"));
-});
-
-test("OpenRouter: lanza ante HTTP no-ok con el status en el mensaje", async () => {
-  mockFetch(500, {});
-  await assert.rejects(
-    () => new OpenRouterProvider("clave").generate(INPUT),
-    /OpenRouter HTTP 500/,
-  );
-});
-
-test("OpenRouter: lanza ante una respuesta sin content", async () => {
-  mockFetch(200, { content: [] });
-  await assert.rejects(
-    () => new OpenRouterProvider("clave").generate(INPUT),
-    /vacía/,
-  );
-});
-
-test("OpenRouter: lanza sin llamar a fetch si no hay API key", async () => {
-  mockFetch(200, {});
-  await assert.rejects(
-    () => new OpenRouterProvider("").generate(INPUT),
     /sin API key/,
   );
   assert.equal(lastRequest, undefined);

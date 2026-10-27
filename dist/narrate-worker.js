@@ -47,14 +47,15 @@ function workerLogPath() {
 // src/lib/config.ts
 var DEFAULTS = {
   enabled: true,
-  messageMode: "llm"
+  messageMode: "local"
 };
 function readFileConfig() {
   try {
     const raw = readFileSync(configPath(), "utf8");
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
-      return parsed;
+      const { enabled, messageMode } = parsed;
+      return { enabled, messageMode };
     }
   } catch {
   }
@@ -62,17 +63,11 @@ function readFileConfig() {
 }
 function loadConfig() {
   const file = readFileConfig();
-  const cfg = {
+  return {
     enabled: typeof file.enabled === "boolean" ? file.enabled : DEFAULTS.enabled,
-    messageMode: file.messageMode === "local" ? "local" : DEFAULTS.messageMode,
-    geminiApiKey: emptyToUndef(file.geminiApiKey),
-    openRouterApiKey: emptyToUndef(file.openRouterApiKey)
+    messageMode: file.messageMode === "llm" ? "llm" : DEFAULTS.messageMode,
+    geminiApiKey: emptyToUndef(process.env.GEMINI_API_KEY)
   };
-  const envGemini = emptyToUndef(process.env.GEMINI_API_KEY);
-  const envOpenRouter = emptyToUndef(process.env.OPENROUTER_API_KEY);
-  if (envGemini) cfg.geminiApiKey = envGemini;
-  if (envOpenRouter) cfg.openRouterApiKey = envOpenRouter;
-  return cfg;
 }
 function emptyToUndef(v) {
   return typeof v === "string" && v.trim() !== "" ? v : void 0;
@@ -160,19 +155,9 @@ function parsePayload(raw) {
 var SUMMARY_SYSTEM_PROMPT = "Eres un desarrollador que habla por voz sintetizada en tiempo real. Narra en primera persona, en una o dos frases breves en espa\xF1ol, \xFAnicamente lo que muestra el material de este turno. Si el turno fue una conversaci\xF3n breve, un saludo o una respuesta sin cambios t\xE9cnicos, n\xE1rralo con naturalidad como tal. No inventes trabajo, comandos, rutas ni identificadores que no aparezcan expl\xEDcitos. Conserva los identificadores y rutas que s\xED est\xE9n presentes cuando aporten claridad. Texto plano, sin markdown ni s\xEDmbolos.";
 var SUMMARY_CLOSING = "Cu\xE9ntamelo en voz alta en primera persona, de forma fiel a lo que ocurri\xF3 en este turno.";
 
-// src/message/provider-chain.ts
+// src/message/provider.ts
 var REQUEST_TIMEOUT_MS = 8e3;
 var MAX_OUTPUT_TOKENS = 512;
-async function runChain(providers, input) {
-  for (const provider of providers) {
-    try {
-      const text = (await provider.generate(input)).trim();
-      if (text) return text;
-    } catch {
-    }
-  }
-  return void 0;
-}
 function buildUserContent(input) {
   const text = (input.text ?? "").trim();
   return `Material del turno:
@@ -217,41 +202,6 @@ var GeminiProvider = class {
     const data = await res.json();
     const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
     if (!text) throw new Error("Gemini devolvi\xF3 respuesta vac\xEDa");
-    return text;
-  }
-};
-
-// src/message/openrouter-provider.ts
-var ENDPOINT2 = "https://openrouter.ai/api/v1/messages";
-var MODEL2 = "poolside/laguna-xs-2.1:free";
-var OpenRouterProvider = class {
-  constructor(apiKey) {
-    this.apiKey = apiKey;
-  }
-  name = "openrouter";
-  async generate(input) {
-    if (!this.apiKey) throw new Error("OpenRouter: sin API key");
-    const content = buildUserContent(input);
-    const body = {
-      model: MODEL2,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system: SUMMARY_SYSTEM_PROMPT,
-      messages: [{ role: "user", content }]
-    };
-    const res = await fetch(ENDPOINT2, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${this.apiKey}`,
-        "x-title": "Agent Voice-InterConnector"
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-    });
-    if (!res.ok) throw new Error(`OpenRouter HTTP ${res.status}`);
-    const data = await res.json();
-    const text = (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join("").trim();
-    if (!text) throw new Error("OpenRouter devolvi\xF3 respuesta vac\xEDa");
     return text;
   }
 };
@@ -385,15 +335,13 @@ async function buildMessage(payload, cfg) {
     const fallback = event === "Stop" ? ANNOUNCEMENTS.Stop : ANNOUNCEMENTS.Default;
     return { kind: "play", label: fallback.label };
   }
-  if (cfg.messageMode === "llm") {
-    const providers = buildProviders(cfg);
-    if (providers.length > 0) {
+  if (cfg.messageMode === "llm" && cfg.geminiApiKey) {
+    try {
       const input = { text: clampHead(raw) };
-      const llm = await runChain(providers, input);
-      if (llm) {
-        const clean = sanitizeForSpeech(llm);
-        if (clean) return { kind: "say", text: clean };
-      }
+      const llm = (await new GeminiProvider(cfg.geminiApiKey).generate(input)).trim();
+      const clean = sanitizeForSpeech(llm);
+      if (clean) return { kind: "say", text: clean };
+    } catch {
     }
   }
   return {
@@ -404,13 +352,6 @@ async function buildMessage(payload, cfg) {
       LOCAL_SPEECH_MAX_SENTENCES
     )
   };
-}
-function buildProviders(cfg) {
-  const providers = [];
-  if (cfg.geminiApiKey) providers.push(new GeminiProvider(cfg.geminiApiKey));
-  if (cfg.openRouterApiKey)
-    providers.push(new OpenRouterProvider(cfg.openRouterApiKey));
-  return providers;
 }
 
 // src/narrate-worker.ts

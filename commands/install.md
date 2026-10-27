@@ -15,8 +15,8 @@ Eres el asistente que guía al usuario para dejar operativo el plugin **Agent Vo
   así. Es seguro re-ejecutar el comando completo.
 - **Nunca** ejecutes acciones destructivas ni uses `sudo`. AI Voice-InterConnector se instala
   a nivel de usuario.
-- **No manejes claves de API en el chat** (quedarían en el transcript). Para las
-  claves, guía al usuario a definir variables de entorno o editar `config.json`.
+- **No manejes claves de API en el chat** (quedarían en el transcript). Para la
+  clave, guía al usuario a definir la variable de entorno `GEMINI_API_KEY`.
 - Si un paso requiere una acción manual del usuario (instalador gráfico, aceptar
   la licencia del modelo en HuggingFace, reiniciar la terminal para el PATH),
   **detente y explica** con claridad qué debe hacer antes de continuar.
@@ -134,13 +134,21 @@ Interpreta el resultado:
 2. **Modo de mensajes** (pregunta al usuario su preferencia):
    - `local` (por defecto, 100 % offline, mensajes simples):
      `node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" mode local`
-   - `llm` (mensajes más elaborados vía Gemini free → OpenRouter `:free`):
+   - `llm` (mensajes más elaborados vía Gemini free tier):
      `node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" mode llm`
 3. Si elige `llm`, **advierte sobre privacidad**: contenido de la sesión sale
-   hacia Google/OpenRouter. Las claves son del usuario; guíalo a definirlas por
-   variable de entorno (tienen precedencia), sin escribirlas en el chat:
-   - `GEMINI_API_KEY` (Gemini free tier) y/o `OPENROUTER_API_KEY` (modelos `:free`).
-   - Alternativa: editar `config.json` en el state dir (la ruta la muestra `narrate-ctl.js status`). Sin claves, `llm` degrada a `local` de facto. Para que la clave persista entre sesiones, usa `config.json`; la variable de entorno solo vive en la terminal donde se definió.
+   hacia Google (Gemini). La clave es del usuario; guíalo a definirla por
+   variable de entorno, sin escribirla en el chat:
+   - `GEMINI_API_KEY` (Gemini free tier). Se lee solo del entorno; el plugin no
+     la guarda en disco.
+   - Windows (PowerShell, sesión actual): `$env:GEMINI_API_KEY = "..."`.
+     Persistente: `setx GEMINI_API_KEY "..."` o Propiedades del sistema →
+     Variables de entorno.
+   - Linux/macOS (sesión actual): `export GEMINI_API_KEY=...`. Persistente:
+     añadir el `export` a `~/.bashrc` o `~/.zshrc`.
+   - Si la variable se define de forma persistente, hay que abrir una terminal
+     nueva o reiniciar Claude Code para que la sesión la herede. Sin clave,
+     `llm` degrada a `local` de facto.
 
 ## Paso 6 — Verificación de extremo a extremo
 

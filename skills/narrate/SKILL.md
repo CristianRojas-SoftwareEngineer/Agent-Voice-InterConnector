@@ -35,15 +35,25 @@ Cuando el usuario pida narrar algo, **redacta tú un texto breve y natural en es
 
 ## Configuración de claves (modo LLM)
 
-El modo `llm` genera los mensajes con niveles gratuitos de LLM: **Gemini** (free tier, principal) y **OpenRouter** (modelos `:free`, fallback). Las claves son del usuario. Por privacidad, **no pidas ni manejes las claves en el chat** (quedarían en el transcript). En su lugar, guía al usuario a proveerlas por una de estas vías, en orden de preferencia:
+El modo `llm` genera los mensajes con el nivel gratuito de **Gemini**. La clave
+es del usuario. Por privacidad, **no pidas ni manejes la clave en el chat**
+(quedaría en el transcript). En su lugar, guía al usuario a definir la variable
+de entorno `GEMINI_API_KEY`; el plugin no la guarda en disco:
 
-1. **Variables de entorno** (tienen precedencia): `GEMINI_API_KEY` y/o
-   `OPENROUTER_API_KEY`.
-2. **Editar `config.json`** en el state dir (la ruta la da `narrate-ctl.js
-status`), añadiendo `"geminiApiKey"` y/o `"openRouterApiKey"`.
+- **Windows (PowerShell, sesión actual)**: `$env:GEMINI_API_KEY = "..."`.
+  Persistente: `setx GEMINI_API_KEY "..."` o Propiedades del sistema →
+  Variables de entorno.
+- **Linux/macOS (sesión actual)**: `export GEMINI_API_KEY=...`. Persistente:
+  añadir el `export` a `~/.bashrc` o `~/.zshrc`.
 
-Sin claves configuradas, el modo `llm` degrada de facto a `local`, que funciona 100 % offline con mensajes más simples.
+Si la variable se define de forma persistente, hay que abrir una terminal nueva
+o reiniciar Claude Code. Sin clave configurada, el modo `llm` degrada de facto a
+`local`, que funciona 100 % offline con mensajes más simples.
 
 ## Privacidad (adviértelo al activar el modo LLM)
 
-El modo `llm` envía el último mensaje del asistente a un tercero (Google u OpenRouter), y solo en la ruta `Stop`: no envía el transcript ni el historial. Es un cambio de postura respecto al motor AI Voice-InterConnector, que sintetiza 100 % offline. Si el usuario activa el modo `llm` o configura claves, recuérdaselo en una frase y menciona que `mode local` evita cualquier envío externo.
+El modo `llm` envía el último mensaje del asistente a Google (Gemini), y solo en
+la ruta `Stop`: no envía el transcript ni el historial. Es un cambio de postura
+respecto al motor AI Voice-InterConnector, que sintetiza 100 % offline. Si el
+usuario activa el modo `llm` o configura la clave, recuérdaselo en una frase y
+menciona que `mode local` evita cualquier envío externo.

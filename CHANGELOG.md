@@ -20,6 +20,14 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Cambiado
 
+- **La API key de Gemini vive solo en el entorno** (`GEMINI_API_KEY`).
+  `config.json` deja de almacenar claves y solo persiste preferencias no
+  secretas (`enabled` y `messageMode`); `loadConfig` ya no lee claves del
+  archivo y `updateConfig` nunca las escribe. Sin `GEMINI_API_KEY`, el modo
+  `llm` degrada a `local`.
+- **`messageMode` por defecto es `local`** (antes el código usaba `llm`), en
+  línea con lo que ya declaraba el README. `llm` sigue siendo opt-in con
+  `GEMINI_API_KEY` y `mode llm`.
 - **La marca del proyecto es ahora Agent Voice-InterConnector** en toda la prosa, y la
   del motor, **AI Voice-InterConnector**. Antes convivían dos formas: «Agent Voice
   InterConnector» sin guion en la prosa del plugin, y «AI-Voice-InterConnector» con
@@ -85,6 +93,12 @@ play`) en vez de re-sintetizarse en cada aparición: el catálogo único de
 
 ### Eliminado
 
+- **OpenRouter como proveedor de fallback**: se eliminan `OPENROUTER_API_KEY`,
+  `openRouterApiKey`, `src/message/openrouter-provider.ts`, la interfaz
+  `TextProvider` y la función `runChain`. La ruta `llm` llama directamente a
+  Gemini y la degradación local se conserva como comportamiento del producto.
+  Sin migración ni retrocompatibilidad: el plugin está en desarrollo pre-beta,
+  sin usuarios ni instalaciones externas.
 - **Modo prompt del subsistema LLM** (`buildPromptMessage`,
   `PROMPT_SYSTEM_PROMPT` y el modo de generación `prompt`), huérfano tras el
   acuse fijo de `UserPromptSubmit`. El modo `summary` (Stop/SubagentStop/

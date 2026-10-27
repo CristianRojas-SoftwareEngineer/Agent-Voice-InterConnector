@@ -87,7 +87,6 @@ export function isolateStateDir(): { dir: string; restore: () => void } {
   const restoreEnv = withEnv({
     XDG_STATE_HOME: dir,
     GEMINI_API_KEY: undefined,
-    OPENROUTER_API_KEY: undefined,
   });
   return {
     dir,

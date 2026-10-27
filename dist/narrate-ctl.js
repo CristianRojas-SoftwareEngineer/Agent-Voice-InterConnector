@@ -35,14 +35,15 @@ function configPath() {
 // src/lib/config.ts
 var DEFAULTS = {
   enabled: true,
-  messageMode: "llm"
+  messageMode: "local"
 };
 function readFileConfig() {
   try {
     const raw = readFileSync(configPath(), "utf8");
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
-      return parsed;
+      const { enabled, messageMode } = parsed;
+      return { enabled, messageMode };
     }
   } catch {
   }
@@ -50,23 +51,20 @@ function readFileConfig() {
 }
 function loadConfig() {
   const file = readFileConfig();
-  const cfg = {
+  return {
     enabled: typeof file.enabled === "boolean" ? file.enabled : DEFAULTS.enabled,
-    messageMode: file.messageMode === "local" ? "local" : DEFAULTS.messageMode,
-    geminiApiKey: emptyToUndef(file.geminiApiKey),
-    openRouterApiKey: emptyToUndef(file.openRouterApiKey)
+    messageMode: file.messageMode === "llm" ? "llm" : DEFAULTS.messageMode,
+    geminiApiKey: emptyToUndef(process.env.GEMINI_API_KEY)
   };
-  const envGemini = emptyToUndef(process.env.GEMINI_API_KEY);
-  const envOpenRouter = emptyToUndef(process.env.OPENROUTER_API_KEY);
-  if (envGemini) cfg.geminiApiKey = envGemini;
-  if (envOpenRouter) cfg.openRouterApiKey = envOpenRouter;
-  return cfg;
 }
 function updateConfig(patch) {
   ensureStateDir();
   const current = readFileConfig();
-  const merged = { ...current, ...patch };
-  writeFileSync(configPath(), JSON.stringify(merged, null, 2) + "\n", {
+  const next = {
+    enabled: patch.enabled ?? (typeof current.enabled === "boolean" ? current.enabled : DEFAULTS.enabled),
+    messageMode: patch.messageMode ?? (current.messageMode === "llm" ? "llm" : DEFAULTS.messageMode)
+  };
+  writeFileSync(configPath(), JSON.stringify(next, null, 2) + "\n", {
     mode: 384
   });
   return loadConfig();
@@ -150,7 +148,6 @@ function printStatus() {
     `enabled:      ${cfg.enabled}`,
     `messageMode:  ${cfg.messageMode}`,
     `gemini key:   ${cfg.geminiApiKey ? "configurada" : "ausente"}`,
-    `openrouter:   ${cfg.openRouterApiKey ? "configurada" : "ausente"}`,
     `config:       ${configPath()}`,
     `state dir:    ${stateDir()}`
   ];

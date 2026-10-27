@@ -21,16 +21,19 @@
 ## 🎯 Próximo ciclo (0.2.x — mejoras incrementales)
 
 ### Estabilidad y robustez
+
 - [ ] **Health-check más granular**: distinguir `model_missing` (exit 4) vs `daemon_unreachable` (exit 5) en aviso SessionStart
 - [ ] **Retry automático daemon start** en health-check si `warming` → `warm_failed` (backoff exponencial, max 3 intentos)
 - [ ] **Timeouts configurables** por hook (hoy hardcoded 10s/30s en hooks.json)
 
 ### Experiencia de usuario
+
 - [ ] **`narrate-ctl test`**: smoke test audible sin sesión Claude (ejecuta las 5 superficies en modo local)
 - [ ] **Modo `verbose` en narrate-ctl**: loguear proveedor usado (local/llm), tokens, latencia
-- [ ] **Comando `doctor` del plugin**: valida CLI motor, modelos, daemon, claves, config.json en una pasada
+- [ ] **Comando `doctor` del plugin**: valida CLI motor, modelos, daemon, clave de entorno y preferencias de configuración en una pasada
 
 ### Configuración
+
 - [ ] **Perfiles de voz por hook**: `voice-stop`, `voice-notification`, etc. configurables (hoy fijos en catálogo)
 - [ ] **Umbral de oraciones `Stop` local** configurable (hoy 2, hardcoded en `clampSentences`)
 - [ ] **Filtro de hooks activos**: desactivar superficies individuales sin editar hooks.json
@@ -40,16 +43,19 @@
 ## 🔮 Dirección media (0.3.x — capacidades nuevas)
 
 ### Narración enriquecida
+
 - [ ] **Contexto de proyecto**: inyectar `cwd`, branch, últimos archivos modificados en prompt LLM (opt-in)
 - [ ] **Narración de diffs**: `Stop` resume qué cambió (archivos, ±líneas) en modo local determinista
 - [ ] **Anuncios dinámicos**: `Notification` incluye tipo de permiso (bash/read/write) en el texto
 
 ### Integración motor
+
 - [ ] **Streaming TTS**: `speech say --stream` → reproducir mientras sintetiza (latencia percibida ↓)
 - [ ] **Clonación de voz del usuario**: `voice clone --name mine` → usar en anuncios (requiere motor ≥ v0.37)
 - [ ] **Evento `started.operation`**: mostrar operación en curso (síntesis/clonación/doblaje) en status
 
 ### Marketplace y distribución
+
 - [ ] **Publicar en marketplace Claude.ai**: validar `marketplace.json`, ícono, screenshots
 - [ ] **Auto-update notificación**: avisar en SessionStart si hay versión nueva del plugin en marketplace
 - [ ] **Homebrew tap / Scoop bucket**: instalación nativa sin clonar repo
@@ -58,13 +64,13 @@
 
 ## 🧭 Ideas en incubación (sin compromiso de versión)
 
-| Idea | Complejidad | Valor | Bloqueantes |
-|------|-------------|-------|-------------|
-| TTS local fallback (piper/coqui) si motor caído | Alta | Offline total | Bundle size, licensing |
-| Narración multi-idioma (detectar idioma del turno) | Media | Equipos distribuidos | Motor soporta cross-lingual |
-| Hook `PreToolUse` / `PostToolUse` para narrar herramientas | Baja | Observabilidad | Ruido potencial alto |
-| Web dashboard de métricas (latencia, proveedor, errores) | Media | Debugging | Privacy, storage |
-| Plugin como extensión VS Code (independiente de Claude) | Alta | Alcance | Arquitectura distinta |
+| Idea                                                       | Complejidad | Valor                | Bloqueantes                 |
+| ---------------------------------------------------------- | ----------- | -------------------- | --------------------------- |
+| TTS local fallback (piper/coqui) si motor caído            | Alta        | Offline total        | Bundle size, licensing      |
+| Narración multi-idioma (detectar idioma del turno)         | Media       | Equipos distribuidos | Motor soporta cross-lingual |
+| Hook `PreToolUse` / `PostToolUse` para narrar herramientas | Baja        | Observabilidad       | Ruido potencial alto        |
+| Web dashboard de métricas (latencia, proveedor, errores)   | Media       | Debugging            | Privacy, storage            |
+| Plugin como extensión VS Code (independiente de Claude)    | Alta        | Alcance              | Arquitectura distinta       |
 
 ---
 
@@ -81,12 +87,12 @@
 
 ## 🗂️ Historial de decisiones descartadas
 
-| Decisión | Motivo | Fecha |
-|----------|--------|-------|
-| Modo `prompt` LLM (buildPromptMessage) | Divergencia semántica + latencia | 2026-10 (v0.2.0) |
-| `speak` command alias | Eliminado en motor sin alias; fallo silencioso | 2026-10 (v0.2.0) |
-| Health-check bloqueante en SessionStart | Bloquea inicio de sesión; diseño no intrusivo | 2026-07 (v0.1.0) |
-| Un solo anuncio genérico para todo | Pérdida de contexto semántico | 2026-10 (v0.2.0) |
+| Decisión                                | Motivo                                         | Fecha            |
+| --------------------------------------- | ---------------------------------------------- | ---------------- |
+| Modo `prompt` LLM (buildPromptMessage)  | Divergencia semántica + latencia               | 2026-10 (v0.2.0) |
+| `speak` command alias                   | Eliminado en motor sin alias; fallo silencioso | 2026-10 (v0.2.0) |
+| Health-check bloqueante en SessionStart | Bloquea inicio de sesión; diseño no intrusivo  | 2026-07 (v0.1.0) |
+| Un solo anuncio genérico para todo      | Pérdida de contexto semántico                  | 2026-10 (v0.2.0) |
 
 ---
 

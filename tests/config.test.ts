@@ -4,8 +4,9 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// Donde viven las credenciales: precedencia env var > archivo > defaults,
-// tolerancia a archivo ausente/corrupto y merge parcial de updateConfig.
+// Las preferencias viven en config.json y el secreto solo en el entorno:
+// defaults, lectura de archivo sin claves, tolerancia a archivo
+// ausente/corrupto y merge parcial de updateConfig.
 // El state dir se aísla en un temporal (ver helpers) para no tocar el real.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -33,80 +34,83 @@ function writeConfigFile(contents: string): void {
 test("loadConfig sin archivo ni env devuelve los defaults", () => {
   const cfg = loadConfig();
   assert.equal(cfg.enabled, true);
-  assert.equal(cfg.messageMode, "llm");
+  assert.equal(cfg.messageMode, "local");
   assert.equal(cfg.geminiApiKey, undefined);
-  assert.equal(cfg.openRouterApiKey, undefined);
 });
 
-test("loadConfig lee los valores del archivo", () => {
+test("loadConfig lee las preferencias del archivo", () => {
+  writeConfigFile(JSON.stringify({ enabled: false, messageMode: "llm" }));
+  const cfg = loadConfig();
+  assert.equal(cfg.enabled, false);
+  assert.equal(cfg.messageMode, "llm");
+});
+
+test("loadConfig ignora las claves presentes en el archivo", () => {
   writeConfigFile(
     JSON.stringify({
       enabled: false,
-      messageMode: "local",
+      messageMode: "llm",
       geminiApiKey: "clave-archivo",
+      openRouterApiKey: "clave-archivo",
     }),
   );
   const cfg = loadConfig();
   assert.equal(cfg.enabled, false);
-  assert.equal(cfg.messageMode, "local");
-  assert.equal(cfg.geminiApiKey, "clave-archivo");
+  assert.equal(cfg.messageMode, "llm");
+  assert.equal(cfg.geminiApiKey, undefined);
+  assert.equal("openRouterApiKey" in cfg, false);
 });
 
 test("loadConfig ignora un archivo con JSON inválido y usa defaults", () => {
   writeConfigFile("{corrupto");
   const cfg = loadConfig();
   assert.equal(cfg.enabled, true);
-  assert.equal(cfg.messageMode, "llm");
+  assert.equal(cfg.messageMode, "local");
 });
 
-test("loadConfig normaliza un messageMode desconocido a llm", () => {
+test("loadConfig normaliza un messageMode desconocido a local", () => {
   writeConfigFile(JSON.stringify({ messageMode: "otro" }));
-  assert.equal(loadConfig().messageMode, "llm");
+  assert.equal(loadConfig().messageMode, "local");
 });
 
-test("loadConfig trata claves vacías o de solo espacios como no configuradas", () => {
-  writeConfigFile(
-    JSON.stringify({ geminiApiKey: "", openRouterApiKey: "   " }),
-  );
-  const cfg = loadConfig();
-  assert.equal(cfg.geminiApiKey, undefined);
-  assert.equal(cfg.openRouterApiKey, undefined);
-});
-
-test("las variables de entorno tienen precedencia sobre el archivo", () => {
-  writeConfigFile(
-    JSON.stringify({
-      geminiApiKey: "del-archivo",
-      openRouterApiKey: "del-archivo",
-    }),
-  );
-  process.env.GEMINI_API_KEY = "del-entorno";
-  const cfg = loadConfig();
-  assert.equal(cfg.geminiApiKey, "del-entorno");
-  // Sin env var propia, la de OpenRouter sigue viniendo del archivo.
-  assert.equal(cfg.openRouterApiKey, "del-archivo");
-});
-
-test("una env var vacía no pisa la clave del archivo", () => {
+test("loadConfig lee la API key solo del entorno", () => {
   writeConfigFile(JSON.stringify({ geminiApiKey: "del-archivo" }));
-  process.env.GEMINI_API_KEY = "   ";
-  assert.equal(loadConfig().geminiApiKey, "del-archivo");
+  process.env.GEMINI_API_KEY = "del-entorno";
+  assert.equal(loadConfig().geminiApiKey, "del-entorno");
 });
 
-test("updateConfig hace merge parcial sin pisar claves no tocadas", () => {
-  updateConfig({ geminiApiKey: "clave-uno", messageMode: "local" });
+test("una env var vacía o de solo espacios no configura la clave", () => {
+  process.env.GEMINI_API_KEY = "   ";
+  assert.equal(loadConfig().geminiApiKey, undefined);
+});
+
+test("updateConfig escribe solo preferencias y descarta claves del archivo", () => {
+  writeConfigFile(
+    JSON.stringify({ geminiApiKey: "clave-vieja", openRouterApiKey: "vieja" }),
+  );
+  updateConfig({ messageMode: "llm" });
+  const raw = JSON.parse(readFileSync(configPath(), "utf8")) as Record<
+    string,
+    unknown
+  >;
+  assert.deepEqual(Object.keys(raw).sort(), ["enabled", "messageMode"]);
+  assert.equal(raw.enabled, true);
+  assert.equal(raw.messageMode, "llm");
+});
+
+test("updateConfig hace merge parcial de preferencias", () => {
+  updateConfig({ messageMode: "llm" });
   updateConfig({ enabled: false });
   const raw = JSON.parse(readFileSync(configPath(), "utf8")) as Record<
     string,
     unknown
   >;
   assert.equal(raw.enabled, false);
-  assert.equal(raw.messageMode, "local");
-  assert.equal(raw.geminiApiKey, "clave-uno");
+  assert.equal(raw.messageMode, "llm");
 });
 
 test("updateConfig crea el state dir si no existe y devuelve la config efectiva", () => {
   const cfg = updateConfig({ enabled: false });
   assert.equal(cfg.enabled, false);
-  assert.equal(cfg.messageMode, "llm");
+  assert.equal(cfg.messageMode, "local");
 });

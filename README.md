@@ -8,8 +8,8 @@ Plugin de [Claude Code](https://code.claude.com) que **narra por voz** la activi
 - **Multiplataforma**: Windows / Linux / macOS, misma experiencia.
 - **Sin prerequisitos de runtime**: los scripts corren sobre el Node.js que
   Claude Code ya trae; no exige Python.
-- **Costo cero**: los mensajes se generan con niveles gratuitos de LLM (Gemini
-  free → OpenRouter `:free`) y degradan a un modo local determinista.
+- **Costo cero**: los mensajes se generan con el nivel gratuito de Gemini
+  (opt-in) y degradan a un modo local determinista.
 - **Controlable**: activa/desactiva la narración sin desinstalar.
 
 ---
@@ -33,14 +33,14 @@ El comando de instalación guía todo el proceso: detecta tu SO, instala el bina
 
 El plugin se integra via **hooks de Claude Code** y consume la **CLI pública** de AI Voice-InterConnector (`ai-voice-interconnector` en el `PATH`). No hay código compartido ni dependencias de build.
 
-| Hook | Acción | Superficie CLI |
-|------|--------|----------------|
-| `UserPromptSubmit` | Acuse fijo «Procesando con Claude» | `speech play --label` |
-| `Stop` | Resumen del turno (local o LLM) | `speech say --daemon` |
-| `SubagentStop` / `StopFailure` / `Notification` | Avisos pre-sintetizados | `speech play --label` |
-| `SessionStart` | Health-check + daemon autostart | `doctor --json`, `daemon status --json`, `daemon start` |
+| Hook                                            | Acción                             | Superficie CLI                                          |
+| ----------------------------------------------- | ---------------------------------- | ------------------------------------------------------- |
+| `UserPromptSubmit`                              | Acuse fijo «Procesando con Claude» | `speech play --label`                                   |
+| `Stop`                                          | Resumen del turno (local o LLM)    | `speech say --daemon`                                   |
+| `SubagentStop` / `StopFailure` / `Notification` | Avisos pre-sintetizados            | `speech play --label`                                   |
+| `SessionStart`                                  | Health-check + daemon autostart    | `doctor --json`, `daemon status --json`, `daemon start` |
 
-El modo `local` (por defecto) es 100 % offline y determinista. El modo `llm` (opt-in con API keys) parafrasea el último mensaje del asistente vía Gemini/OpenRouter.
+El modo `local` (por defecto) es 100 % offline y determinista. El modo `llm` (opt-in con `GEMINI_API_KEY`) parafrasea el último mensaje del asistente vía Gemini.
 
 ---
 
@@ -48,36 +48,59 @@ El modo `local` (por defecto) es 100 % offline y determinista. El modo `llm` (op
 
 ### Estado (`config.json`)
 
+`config.json` solo guarda preferencias no secretas (`enabled` y `messageMode`). La API key **nunca** se escribe en este archivo.
+
 Ubicación por SO:
 
-| SO | Ruta |
-|----|------|
-| Windows | `%LOCALAPPDATA%\agent-voice-interconnector\config.json` |
-| Linux | `${XDG_STATE_HOME:-~/.local/state}/agent-voice-interconnector/config.json` |
-| macOS | `~/Library/Application Support/agent-voice-interconnector/config.json` |
+| SO      | Ruta                                                                       |
+| ------- | -------------------------------------------------------------------------- |
+| Windows | `%LOCALAPPDATA%\agent-voice-interconnector\config.json`                    |
+| Linux   | `${XDG_STATE_HOME:-~/.local/state}/agent-voice-interconnector/config.json` |
+| macOS   | `~/Library/Application Support/agent-voice-interconnector/config.json`     |
 
-### Claves API (modo `llm`)
-
-Preferencia: **variables de entorno** (prevalecen sobre archivo, no persisten en disco):
-
-```bash
-export GEMINI_API_KEY=...      # principal
-export OPENROUTER_API_KEY=...  # fallback
-```
-
-Alternativa: editar `config.json` (útil si Claude Code se lanza desde GUI):
+Ejemplo:
 
 ```json
 {
   "enabled": true,
-  "messageMode": "llm",
-  "geminiApiKey": "...",
-  "openRouterApiKey": "..."
+  "messageMode": "local"
 }
 ```
 
-- `enabled`: interruptor global
-- `messageMode`: `"local"` (determinista, offline) o `"llm"` (parafraseo). Sin keys, `llm` → `local`.
+- `enabled`: interruptor global.
+- `messageMode`: `"local"` (por defecto, determinista y offline) o `"llm"` (parafraseo con Gemini). Sin `GEMINI_API_KEY`, `llm` degrada a `local`.
+
+### Clave API (solo modo `llm`)
+
+La clave se lee **exclusivamente** de la variable de entorno `GEMINI_API_KEY`; el plugin no la guarda en disco.
+
+**Windows (PowerShell, sesión actual):**
+
+```powershell
+$env:GEMINI_API_KEY = "..."
+```
+
+**Windows (persistente para el usuario):**
+
+```powershell
+setx GEMINI_API_KEY "..."
+```
+
+`setx` no afecta a la sesión actual: abre una terminal nueva o reinicia Claude Code. También puedes definirla en **Propiedades del sistema → Variables de entorno**.
+
+**Linux/macOS (sesión actual):**
+
+```bash
+export GEMINI_API_KEY=...
+```
+
+**Linux/macOS (persistente):** añade el `export` a `~/.bashrc` o `~/.zshrc` y abre una terminal nueva.
+
+Notas:
+
+- Claude Code lanzado desde una GUI puede no heredar el entorno de la shell. Si `status` reporta la clave ausente, define la variable de forma persistente (o lanza Claude Code desde una terminal donde esté definida) y reinicia Claude Code.
+- No uses `.env`: el plugin no lo lee.
+- Para activar el parafraseo: define `GEMINI_API_KEY` y ejecuta `node "${CLAUDE_PLUGIN_ROOT}/dist/narrate-ctl.js" mode llm`. `status` confirma `gemini key: configurada` sin mostrar el valor.
 
 Ver modelo de amenazas completo en [SECURITY.md](SECURITY.md). La skill `/agent-voice-interconnector:narrate` expone toggles interactivos.
 
@@ -86,7 +109,7 @@ Ver modelo de amenazas completo en [SECURITY.md](SECURITY.md). La skill `/agent-
 ## Privacidad
 
 - **Modo `local`**: cero red, 100 % offline, mensajes simples.
-- **Modo `llm`**: solo en evento `Stop` envía `last_assistant_message` (sin transcript ni historial) a Google/OpenRouter. Opt-in explícito: requiere configurar tus claves.
+- **Modo `llm`**: solo en evento `Stop` envía `last_assistant_message` (sin transcript ni historial) a Google (Gemini). Opt-in explícito: requiere `GEMINI_API_KEY` y `mode llm`.
 - El resto de hooks (`UserPromptSubmit`, `SubagentStop`, `StopFailure`, `Notification`) **nunca** usan red: reproducen avisos pre-sintetizados locales.
 
 ---

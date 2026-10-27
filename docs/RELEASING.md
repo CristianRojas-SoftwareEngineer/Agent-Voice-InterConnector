@@ -81,9 +81,9 @@ En orden; cada paso asume el anterior.
    publicados** (no desde su árbol de desarrollo):
    - narración de **todas** las superficies del contrato (los cinco hooks
      registrados en `hooks/hooks.json`: `UserPromptSubmit`, `Stop`,
-     `SubagentStop`, `StopFailure` y `Notification`) en modo `local` (sin claves)
-     y en modo `llm` (con clave configurada); no basta con `Stop` — una superficie
-     no probada puede liberarse con un bug;
+     `SubagentStop`, `StopFailure` y `Notification`) en modo `local` (sin
+     clave) y con `Stop` en modo `llm` (con `GEMINI_API_KEY` definida); no
+     basta con `Stop` — una superficie no probada puede liberarse con un bug;
    - `narrate-ctl status` reporta el estado sin exponer claves;
    - el aviso de `SessionStart` cuando el motor no está en el `PATH`.
 7. **Commit, tag y push**:
@@ -158,7 +158,7 @@ Notas de contrato que el runbook asume (verificado en código fuente):
 - `narrate-ctl status` **no** reporta el daemon; el estado del daemon se consulta
   con `ai-voice-interconnector daemon status --json`.
 - `narrate-ctl status` **nunca** imprime el valor de ninguna clave: solo muestra
-  `gemini key:   configurada|ausente` y `openrouter:   configurada|ausente`.
+  `gemini key:   configurada|ausente`.
 - `narrate-ctl say` pasa el texto directo a `ai-voice-interconnector speech say --text ... --daemon`
   (pipeline TTS + daemon); **no** ejercita la generación de mensaje (`local`/`llm`).
 - `worker.log` (en `$STATE_DIR`) registra **solo errores** de narración, no qué
@@ -298,7 +298,7 @@ claude --plugin-dir $PLUGIN_E2E
      narrado es limpio y casi textual; para `Stop` en modo `local`, son las dos
      primeras oraciones en prosa.
 
-- **(B) Las superficies clave en modo `llm` (con clave de proveedor):**
+- **(B) Las superficies clave en modo `llm` (con `GEMINI_API_KEY`):**
   1. Define la clave en el entorno de la sesión de PowerShell:
      ```powershell
      $env:GEMINI_API_KEY = "<tu-clave-gemini>"
@@ -310,8 +310,8 @@ claude --plugin-dir $PLUGIN_E2E
      ```
   3. Lanza Claude desde esa misma sesión y dispara **`Stop`** — es la única
      superficie que enruta al LLM.
-  4. **Comprobación:** la locución de `Stop` suena **parafraseada** (cadena
-     LLM), distinta del resumen local determinista. `UserPromptSubmit`,
+  4. **Comprobación:** la locución de `Stop` suena **parafraseada** (Gemini),
+     distinta del resumen local determinista. `UserPromptSubmit`,
      `SubagentStop`, `StopFailure` y `Notification` no tienen paráfrasis que
      verificar: siempre reproducen su aviso pre-sintetizado, sin LLM, igual que en
      modo `local`.

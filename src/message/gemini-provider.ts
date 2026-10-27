@@ -4,7 +4,7 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// Proveedor principal: Gemini API (free tier) vía fetch nativo, sin SDK.
+// Proveedor único de texto: Gemini API (free tier) vía fetch nativo, sin SDK.
 // thinking desactivado (thinkingBudget: 0) y salida acotada para optimizar
 // latencia y cuota.
 import {
@@ -12,8 +12,7 @@ import {
   MAX_OUTPUT_TOKENS,
   REQUEST_TIMEOUT_MS,
   type GenerationInput,
-  type TextProvider,
-} from "./provider-chain.js";
+} from "./provider.js";
 import { SUMMARY_SYSTEM_PROMPT } from "./prompts.js";
 
 // Modelo del Orchestrator (§5.4): gemini-3.1-flash-lite, probado en
@@ -28,7 +27,7 @@ interface GeminiResponse {
   }>;
 }
 
-export class GeminiProvider implements TextProvider {
+export class GeminiProvider {
   readonly name = "gemini";
   constructor(private readonly apiKey: string) {}
 
