@@ -120,8 +120,8 @@ Si el release del plugin **no** acompaña a uno del motor (una corrección propi
 - Si la entrada del changelog del motor menciona la disponibilidad del plugin,
   confirmar que el enlace apunta al tag correcto.
 - Actualizar [`ROADMAP.md`](ROADMAP.md): las direcciones ya implementadas o
-  descartadas se mueven al histórico; las nuevas que surjan del release se
-  incorporan a la sección correspondiente.
+  descartadas se retiran del documento (el historial queda en git); las nuevas
+  que surjan del release se incorporan a la sección correspondiente.
 
 ## Runbook ejecutable
 
@@ -410,6 +410,6 @@ git ls-remote --tags https://github.com/CristianRojas-SoftwareEngineer/Agent-Voi
 #    apunta al tag correcto.
 Select-String -Path "$ENGINE_ROOT\CHANGELOG.md" -Pattern "Agent[ -]Voice-InterConnector"
 
-# 3. Actualizar ROADMAP.md con las direcciones cerradas y las que surjan
-#    de este release.
+# 3. Actualizar ROADMAP.md: retirar las direcciones cerradas y añadir las que
+#    surjan de este release.
 ```

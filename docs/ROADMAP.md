@@ -1,204 +1,131 @@
 # Roadmap — Agent Voice-InterConnector
 
-Este documento fue originalmente el registro de preparación del primer release
-(`RELEASE-READINESS.md`). Ahora que `v0.1.0` está publicado
-([commit `f55e8c0`](https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector/tree/v0.1.0),
-tag `v0.1.0`, 2026-07-22), se convierte en el **roadmap vivo** del plugin
-— el análogo del `ROADMAP.md` del motor AI Voice-InterConnector, a escala de plugin.
+Este es el roadmap vivo del plugin y mira hacia adelante: reúne las direcciones
+que todavía no están implementadas. Lo ya construido y lo descartado no se
+conserva aquí; su relato vive en el historial de git. No hay fechas ni
+compromisos: cada release revisa, promueve o retira ideas según el uso real y el
+feedback de la beta.
 
-Las secciones que siguen describen **direcciones posibles**, no compromisos.
-Cada idea se concretará o descartará según el feedback que llegue tras el
-lanzamiento beta. No hay fechas ni prioridades fijas hasta entonces.
+## Consolidar la beta (0.2.x)
 
-## Direcciones para v0.2.0 y siguientes
+El foco inmediato es cerrar las aristas que aparecen cuando el plugin se usa de
+verdad: ráfagas de hooks, un daemon que falla o tarda, y la necesidad de
+diagnosticar sin abrir una consola. La prioridad es que la narración siga siendo
+invisible cuando todo va bien y fácil de reparar cuando no.
 
-### Cola FIFO persistente de narración
+### Narración sin carreras
 
-La Opción 1 (worker que espera su turno en vez de matar al anterior) ya está
-implementada en `src/narrate-worker.ts` y resuelve el solapamiento para el caso
-de uso habitual (5 hooks, disparos ocasionales). Una mejora posterior sería
-reemplazar el esquema actual —un worker efímero por hook que espera— por un
-único worker persistente con una cola FIFO interna: cada hook apenda su texto a
-la cola y el worker los reproduce uno a uno con `ai-voice-interconnector speech say --daemon`.
+El handoff actual —un `payload.json` compartido y un worker efímero por hook—
+funciona para el uso ocasional, pero no garantiza que cada worker lea el payload
+que le corresponde bajo ráfagas. La dirección es una cola FIFO persistente con
+un único consumidor:
 
-Ventajas respecto al esquema actual:
+- Un solo worker persistente recibe los eventos y los reproduce en orden.
+- El orden deja de depender de una cerradura de PID o de una ventana de carrera.
+- El ciclo de vida se vuelve explícito: drenar y salir en `SessionEnd`.
+- La cola admite políticas: tope, descarte del evento más viejo y `pendientes: N`
+  en `narrate-ctl status`.
+- El costo de levantar un proceso por hook desaparece.
 
-- **Orden libre de carreras por construcción:** un solo consumidor FIFO, sin
-  cerradura de archivo PID ni ventana de carrera bajo ráfagas de hooks.
-- **Un solo proceso** en vez de N workers desanclados esperando su turno.
-- **Ciclo de vida limpio:** el worker se puede apagar y drenar (ej. en
-  `SessionEnd`: reproduce lo pendiente y sale).
-- **Punto único para políticas y observabilidad:** limitar el largo de la cola,
-  descartar el evento más viejo si se llena, mostrar `pendientes: N` en
-  `narrate-ctl status`.
+### Robustez y recuperación
 
-_Decisión diferida:_ implementar solo si en uso real se observan ráfagas de
-hooks que saturan la cadena de espera de la Opción 1, o si se quieren políticas
-de cola (tope, descarte, estado en `status`).
+- Añadir timeout a las invocaciones `speech play` y `speech say` del worker, con
+  terminación del proceso hijo y registro en `worker.log`.
+- Reintentar `daemon start` con backoff cuando el daemon queda en `warming` y
+  deriva en `warm_failed`.
+- Distinguir en el aviso de `SessionStart` entre modelo ausente
+  (`model_missing`, exit 4) y daemon inalcanzable (`daemon_unreachable`, exit 5).
+- Revisar el timeout de la ruta LLM (hoy 8 s) para que la caída a `local` sea más
+  rápida cuando no hay conectividad.
+- Mantener el arranque del daemon como best-effort y nunca bloquear la sesión.
 
-### Mejoras de performance
+### Diagnóstico y control
 
-Áreas identificadas como candidatas a optimización, sin órdenes de magnitud
-medidos aún (se determinarán con uso real):
+- `narrate-ctl test`: smoke test audible que recorre las superficies en modo
+  local sin abrir una sesión de Claude Code.
+- Modo `verbose` en `narrate-ctl`: proveedor usado, latencia y, si aplica,
+  consumo de tokens.
+- Comando `doctor` del plugin: CLI del motor, modelos, daemon, clave de entorno y
+  preferencias en una sola pasada.
+- `narrate-ctl status` con el estado de la cola (`pendientes`, worker activo)
+  cuando exista la cola FIFO.
 
-- **Degradación local:** en el MVP determinista el transcript ya **no** alimenta
-  al LLM (el input es solo `last_assistant_message`), por lo que
-  `readTranscriptMessages` y el parseo JSONL fueron retirados. La degradación
-  local usa `clampSentences` sobre el texto ya saneado, con dos topes: hasta
-  `LOCAL_SPEECH_MAX_SENTENCES` (2) oraciones, que es el criterio de selección
-  porque las primeras frases del turno concentran el resumen general, y
-  `LOCAL_SPEECH_MAX_CHARS` (500) como freno de emergencia ante turnos
-  patológicos. Ninguno de los dos topes parte una oración: el que frena retira
-  siempre la última oración completa, para que el mensaje narrado sea
-  autocontenido. Su costo es acotado y no depende del tamaño del transcript. Si
-  una iteración futura reintroduce contexto al LLM, volvería a aplicar el punto
-  sobre cachear/limitar la cola.
-- **Proveedor LLM:** la ruta `llm` llama directamente a Gemini; `local` no es
-  un provider sino la rama de degradación, que vive fuera de la llamada. Un
-  timeout temprano aceleraría la caída a `local` cuando no hay conectividad.
-- **Worker de narración:** el worker actual se lanza, espera, sintetiza y
-  muere por hook; un worker persistente (ver cola FIFO arriba) eliminaría el
-  costo de levantar el subproceso en cada llamada.
+### Configuración
 
-### Corrección de bugs
+- Timeouts por hook, en lugar de los valores fijos de `hooks/hooks.json`.
+- Perfiles de voz por evento (`voice-stop`, `voice-notification`, …).
+- Umbral de oraciones de la degradación local configurable.
+- Activación selectiva de hooks sin editar `hooks/hooks.json`.
 
-No hay bugs reportados aún (beta). Esta sección se poblará con los reportes
-que lleguen tras el lanzamiento. El pipeline de CI y la suite de tests
-son la primera línea de defensa; el canal de reporte es
-[GitHub Security Advisories](https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector/security/advisories)
-(para bugs de seguridad) e
-[issues públicos](https://github.com/CristianRojas-SoftwareEngineer/Agent-Voice-InterConnector/issues)
-(para el resto).
+### Pruebas
 
-### Gobernanza de versión del motor
+- Smoke test E2E automatizado en CI sobre Linux, Windows y macOS.
+- Ejercitar las cinco superficies de narración y el health-check en los tres
+  sistemas, no solo la lógica pura.
 
-`health-check` podría consultar `ai-voice-interconnector version` y avisar —sin
-bloquear— si el motor instalado es más viejo que la versión con la que se
-verificó el plugin. Hoy la degradación silenciosa es el comportamiento base y está
-documentado en `docs/INTEGRATION.md`; la verificación programática sería una
-capa adicional de cortesía para el usuario.
+## Narración enriquecida e integración (0.3.x)
 
-### Otras mejoras
+Con la beta estable, el siguiente salto es que la locución tenga más contexto sin
+perder la fidelidad al turno ni la privacidad por defecto.
 
-Cualquier dirección que emerja del feedback post-beta se registrará aquí.
-Hasta entonces el foco es observar cómo se comporta el plugin en uso real,
-qué superficies se usan más y dónde roza la experiencia de instalación o
-de narración.
+### Más contexto, siempre opt-in
+
+- Inyectar `cwd`, branch y últimos archivos modificados en el prompt del LLM.
+- Narrar diffs en modo local determinista: archivos y líneas cambiadas.
+- Anuncios de `Notification` con el tipo de permiso (bash/read/write).
+- Si el contexto crece, cachear y limitar la cola de mensajes para que el costo
+  no dependa del tamaño del transcript.
+
+### Voz y streaming
+
+- `speech say --stream` para reproducir mientras el motor sintetiza.
+- Clonación de voz del usuario (`voice clone --name mine`) cuando el motor la
+  exponga.
+- Mostrar la operación en curso (síntesis, clonación, doblaje) en `status`.
+
+### Distribución
+
+- Publicar en el marketplace de Claude.ai con ficha, screenshots y validación
+  estricta.
+- Avisar en `SessionStart` cuando haya una versión nueva del plugin.
+- Ofrecer instalación nativa vía Homebrew tap o Scoop bucket.
+
+## Gobernanza del motor
+
+- Consultar `ai-voice-interconnector version` en `SessionStart` y avisar —sin
+  bloquear— si el motor instalado es más viejo que el verificado con el plugin.
+- Detectar deriva del contrato de las seis superficies CLI antes de que se
+  convierta en un fallo silencioso.
+
+## Ideas en incubación
+
+| Idea                                                               | Complejidad | Valor                | Bloqueantes                     |
+| ------------------------------------------------------------------ | ----------- | -------------------- | ------------------------------- |
+| TTS local de respaldo (piper/coqui) si el motor no está disponible | Alta        | Offline total        | Tamaño del bundle, licencias    |
+| Narración multi-idioma (detectar el idioma del turno)              | Media       | Equipos distribuidos | Soporte cross-lingual del motor |
+| Hooks `PreToolUse`/`PostToolUse` para narrar herramientas          | Baja        | Observabilidad       | Ruido potencial alto            |
+| Dashboard web de métricas (latencia, proveedor, errores)           | Media       | Debugging            | Privacidad, almacenamiento      |
+| Extensión de VS Code independiente de Claude Code                  | Alta        | Alcance              | Arquitectura distinta           |
+
+## Criterios para 1.0.0
+
+- Motor AI Voice-InterConnector en `v1.0.0`, publicado y estable.
+- Plugin sin deprecaciones ni APIs experimentales.
+- Smoke test E2E automatizado en CI sobre Linux, Windows y macOS.
+- Documentación completa: usuario, desarrollo, arquitectura y contrato.
+- Publicación en el marketplace de Claude.ai con validación estricta.
+- Changelog limpio, con cada entrada vinculada a su PR o issue.
 
 ## Versionado
 
-El plugin y el motor AI Voice-InterConnector llevan versionados **independientes**, cada
-uno reflejo de su propia historia de desarrollo — lo que se sincroniza entre
-ambos es el lanzamiento, no el número. La disparidad de números es temporal
-por decisión.
+El plugin y el motor llevan versionados independientes. Durante el tramo pre-1.0
+el plugin publica sus versiones intermedias a su propio ritmo; cuando AI
+Voice-InterConnector alcance `v1.0.0`, el plugin avanzará desde la versión que
+haya alcanzado hasta `1.0.0` en un release que acumule las correcciones
+implementadas. Ese salto será intencional, no un error de versionado.
 
-**Convergencia planificada en v1.0.0:** durante el tramo pre-1.0 el plugin
-publica sus versiones intermedias (`v0.2.0`, `v0.3.0`, …) al ritmo que
-dicten sus correcciones y mejoras, sin relación con los números del motor.
-Cuando AI Voice-InterConnector alcance su `v1.0.0`, el plugin avanzará desde la versión
-que haya alcanzado hasta ese momento directamente a `1.0.0`, en un release
-que acumule las correcciones implementadas hasta entonces. Ese salto está
-registrado en el `CHANGELOG.md` para que no parezca un error de versionado.
+## Mantenimiento
 
-## Gestión de la clave de API — nota de transparencia
-
-El diseño actual sigue buenas prácticas y **no requiere `.env`/`.env.example`**:
-el plugin se distribuye clonando el repo (`dist/` commiteado), así que un
-`.env` en la raíz viviría dentro del árbol compartido por todos los usuarios
-del clon y se pisaría en cada actualización — el lugar correcto para el
-secreto de cada usuario es fuera del repo, en el entorno del proceso.
-
-Resumen del diseño (`src/lib/config.ts`, `src/lib/state-dir.ts`):
-
-- La API key se lee únicamente de la variable de entorno `GEMINI_API_KEY`.
-  Sin clave, el modo `llm` degrada a `local`.
-- `config.json` guarda solo preferencias no secretas (`enabled` y
-  `messageMode`); nunca contiene claves.
-- `config.json` nunca vive en el repo; se crea en tiempo de ejecución en
-  `%LOCALAPPDATA%\agent-voice-interconnector` (Windows), `~/.local/state/agent-voice-interconnector`
-  (Linux) o `~/Library/Application Support/agent-voice-interconnector` (macOS).
-- Ninguna skill ni comando pide o maneja la clave dentro del chat (evita que
-  quede en el transcript); ambos guían al usuario a la variable de entorno.
-- `narrate-ctl.js status` nunca imprime el valor de la clave, solo si está
-  configurada en el entorno.
-
-## Apéndice: histórico del release v0.1.0
-
-Lo que sigue es el registro del trabajo que llevó al primer release.
-Se conserva como referencia de las decisiones tomadas.
-
-### Contexto del release
-
-Primer release público, lanzado en conjunto con AI Voice-InterConnector v0.7.8.
-El plugin llegó con cobertura de tests y documentación equiparable a la
-del motor — no en cantidad, sino en las categorías que aplican a su
-superficie propia (~17 módulos TypeScript, sin runtime extra, distribuido
-clonando el repo).
-
-### Cobertura de testing
-
-Suite de 148 tests con `node --test` (sin framework externo), cubriendo:
-
-| Módulo                                                      | Qué cubre                                                                    |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `src/message/sanitize.ts`                                   | Saneamiento de markdown, URLs y descarte del cuerpo de los bloques de código |
-| `src/message/clamp.ts`                                      | Recorte determinista por oraciones completas y topes de la degradación local |
-| `src/message/provider-chain.ts`                             | Fallback Gemini → OpenRouter → local                                         |
-| `src/lib/config.ts`                                         | Precedencia env var > archivo > defaults                                     |
-| `src/lib/hook-payload.ts`                                   | Parseo del JSON de Claude Code                                               |
-| `src/lib/state-dir.ts`                                      | Resolución del state dir en los 3 SO                                         |
-| `src/lib/resolve-cli.ts`                                    | Resolución del binario en PATH (con PATHEXT en Windows)                      |
-| `src/message/gemini-provider.ts` / `openrouter-provider.ts` | Parseo de respuesta y errores HTTP (fetch mockeado)                          |
-| `src/narrate-ctl.ts`                                        | Subcomandos on/off/mode/status/say; status sin exponer claves                |
-
-La frontera de testing es por **naturaleza del código**, no por módulo: la
-**lógica pura** que vive dentro de estos módulos sí se cubre en unitario —p. ej.
-`daemon.ts`, cuyo parseo de `daemon status --json` en `isDaemonRunning` se fija
-con un shim falso (`tests/daemon.test.ts`)—. Lo que queda fuera a propósito es el
-**efecto de orquestación de procesos** en sí (`narrate-hook.ts`,
-`narrate-worker.ts`, `spawnDetached`/`killWorkerTree` en `spawn.ts`,
-`startDaemonDetached` en `daemon.ts`): lanzar, desanclar y terminar procesos del
-SO depende de primitivas específicas por plataforma que un test unitario
-determinista no puede observar, y su verificación quedó cubierta por el smoke
-test E2E.
-
-### CI
-
-Pipeline en CircleCI con triple puerta `test-linux`/`test-windows`/`test-macos`
-(misma nomenclatura que el motor), corriendo en cada push a `main`:
-`npm ci && npm run typecheck && npm run build && npm test`.
-**Verificado en pipeline #28** (2026-07-22), los tres jobs exitosos.
-
-No hay CD: el plugin no publica artefactos; su "build" (`dist/`) se
-commitea y el release es un tag de git.
-
-### Documentación
-
-Las tres piezas documentales requeridas se escribieron:
-
-- `SECURITY.md` — modelo de amenaza, canal de reporte, nota Windows/ACL
-- `CHANGELOG.md` — Keep a Changelog, versión sincronizada con el motor
-- `docs/RELEASING.md` — proceso de release, bump doble, smoke test,
-  referencias cruzadas con el motor
-
-### Sincronización con el motor
-
-El release del motor (v0.7.8) precedió al del plugin. La secuencia fue:
-
-1. Motor corta tag, CI publica binarios nativos por SO
-2. Plugin se verifica contra el motor instalado **desde artefactos publicados**
-3. Recién entonces se corta el tag del plugin
-
-Smoke test E2E (2026-07-22): las cinco superficies (`UserPromptSubmit`,
-`Stop`, `SubagentStop`, `StopFailure`, `Notification`) verificadas en modo
-`local` (5 hooks) y `llm` (3 hooks); `narrate-ctl status` sin exponer
-claves; aviso sin motor en PATH.
-
-### Checklist completado
-
-1. ✅ **Testing** — suite `node --test`, 100 tests
-2. ✅ **CI** — CircleCI triple puerta, pipeline #28 en verde
-3. ✅ **Documentación** — SECURITY.md, CHANGELOG.md, docs/RELEASING.md
-4. ✅ **Sincronización** — v0.7.8 publicado, smoke test E2E completado
-5. ✅ **Corte** — bump 0.1.0, changelog cortado, commit `a360919`,
-   tag `v0.1.0` pusheado (2026-07-22)
+Cada release revisa este documento según `docs/RELEASING.md` §Después del tag:
+las ideas implementadas o descartadas se retiran (su historial queda en git) y
+las nuevas que surjan del uso real se incorporan a la sección correspondiente.

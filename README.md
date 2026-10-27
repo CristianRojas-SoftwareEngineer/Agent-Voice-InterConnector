@@ -153,7 +153,7 @@ CircleCI (`.circleci/config.yml`): `typecheck`, `build`, `test` en Linux/Windows
 - [`docs/RELEASING.md`](docs/RELEASING.md) — proceso de release y sincronización con motor.
 - [`SECURITY.md`](SECURITY.md) — política de seguridad, modelo de amenazas, credenciales.
 - [`CHANGELOG.md`](CHANGELOG.md) — cambios por versión.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — direcciones futuras e histórico v0.1.0.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — direcciones futuras del plugin.
 
 Contraparte del motor: [AI-Voice-InterConnector/docs/CLI/CONTRACT.md §12](https://github.com/CristianRojas-SoftwareEngineer/AI-Voice-InterConnector/blob/main/docs/CLI/CONTRACT.md#12-contratos-externos).
 
