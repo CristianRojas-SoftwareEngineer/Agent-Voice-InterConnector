@@ -135,11 +135,11 @@ jobs:
             npm run typecheck
             echo "[STEP] Typecheck (tsc --noEmit) - FIN"
       - run:
-          name: Build dist/ from src/
+          name: Check dist/ sincronizado con src/ (no escribe)
           command: |
-            echo "[STEP] Build dist/ from src/ - INICIO"
-            npm run build
-            echo "[STEP] Build dist/ from src/ - FIN"
+            echo "[STEP] Check dist/ sincronizado con src/ (no escribe) - INICIO"
+            npm run check-dist
+            echo "[STEP] Check dist/ sincronizado con src/ (no escribe) - FIN"
       - run:
           name: Run node --test suite over tests/
           command: |
@@ -189,13 +189,13 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             Write-Host "[STEP] Typecheck (tsc --noEmit) - FIN"
       - run:
-          name: Build dist/ from src/
+          name: Check dist/ sincronizado con src/ (no escribe)
           command: |
-            Write-Host "[STEP] Build dist/ from src/ - INICIO"
+            Write-Host "[STEP] Check dist/ sincronizado con src/ (no escribe) - INICIO"
             $env:Path = "C:\Program Files\nodejs;" + $env:Path
-            npm run build
+            npm run check-dist
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            Write-Host "[STEP] Build dist/ from src/ - FIN"
+            Write-Host "[STEP] Check dist/ sincronizado con src/ (no escribe) - FIN"
       - run:
           name: Run node --test suite over tests/
           command: |
@@ -251,11 +251,11 @@ jobs:
             npm run typecheck
             echo "[STEP] Typecheck (tsc --noEmit) - FIN"
       - run:
-          name: Build dist/ from src/
+          name: Check dist/ sincronizado con src/ (no escribe)
           command: |
-            echo "[STEP] Build dist/ from src/ - INICIO"
-            npm run build
-            echo "[STEP] Build dist/ from src/ - FIN"
+            echo "[STEP] Check dist/ sincronizado con src/ (no escribe) - INICIO"
+            npm run check-dist
+            echo "[STEP] Check dist/ sincronizado con src/ (no escribe) - FIN"
       - run:
           name: Run node --test suite over tests/
           command: |

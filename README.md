@@ -143,7 +143,7 @@ claude plugin validate --strict .
 
 ### CI
 
-CircleCI (`.circleci/config.yml`): `typecheck`, `build`, `test` en Linux/Windows/macOS + `validate-manifest` (nombre del plugin).
+CircleCI (`.circleci/config.yml`): `check-dist`, `lint`, `format:check`, `typecheck` y `test` en Linux; `check-dist`, `typecheck` y `test` en Windows/macOS; `validate-manifest` (nombre del plugin).
 
 ---
 

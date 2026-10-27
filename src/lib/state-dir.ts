@@ -6,8 +6,8 @@
 
 // State dir por convención de cada SO. Equivalente en miniatura al data_root()
 // de AI Voice-InterConnector, sin depender de él. Contiene config.json (solo
-// preferencias no secretas), worker.pid, payload.json y worker.log. La API key
-// se lee del entorno y no se guarda aquí.
+// preferencias no secretas), worker.pid, queue/ (cola de payloads de narración)
+// y worker.log. La API key se lee del entorno y no se guarda aquí.
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
@@ -46,8 +46,8 @@ export function workerPidPath(): string {
   return join(stateDir(), "worker.pid");
 }
 
-export function payloadPath(): string {
-  return join(stateDir(), "payload.json");
+export function queueDir(): string {
+  return join(stateDir(), "queue");
 }
 
 export function workerLogPath(): string {

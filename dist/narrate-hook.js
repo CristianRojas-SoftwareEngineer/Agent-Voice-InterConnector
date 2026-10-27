@@ -1,9 +1,9 @@
 // Generado por build.mjs (esbuild). No editar a mano; editar src/ y recompilar.
 
 // src/narrate-hook.ts
-import { writeFileSync as writeFileSync2 } from "node:fs";
+import { readFileSync as readFileSync3 } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join as join2 } from "node:path";
+import { dirname, join as join3 } from "node:path";
 
 // src/lib/config.ts
 import { readFileSync, writeFileSync } from "node:fs";
@@ -36,8 +36,11 @@ function ensureStateDir() {
 function configPath() {
   return join(stateDir(), "config.json");
 }
-function payloadPath() {
-  return join(stateDir(), "payload.json");
+function workerPidPath() {
+  return join(stateDir(), "worker.pid");
+}
+function queueDir() {
+  return join(stateDir(), "queue");
 }
 
 // src/lib/config.ts
@@ -69,17 +72,17 @@ function emptyToUndef(v) {
   return typeof v === "string" && v.trim() !== "" ? v : void 0;
 }
 
-// src/lib/spawn.ts
-import { spawn, spawnSync } from "node:child_process";
-function spawnDetached(cmd, args) {
-  const child = spawn(cmd, args, {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: true
-  });
-  child.unref();
-  return child.pid;
-}
+// src/lib/queue.ts
+import {
+  mkdirSync as mkdirSync2,
+  readFileSync as readFileSync2,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync as writeFileSync2
+} from "node:fs";
+import { join as join2 } from "node:path";
 
 // src/lib/hook-payload.ts
 function parsePayload(raw) {
@@ -107,17 +110,60 @@ function readStdin() {
   });
 }
 
+// src/lib/queue.ts
+var MAX_AGE_MS = 60 * 60 * 1e3;
+function enqueuePayload(payload) {
+  ensureStateDir();
+  const dir = queueDir();
+  mkdirSync2(dir, { recursive: true });
+  const name = `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2)}.json`;
+  const finalPath = join2(dir, name);
+  const tmpPath = join2(dir, `.tmp-${name}`);
+  writeFileSync2(tmpPath, JSON.stringify(payload), "utf8");
+  renameSync(tmpPath, finalPath);
+  return finalPath;
+}
+
+// src/lib/spawn.ts
+import { spawn, spawnSync } from "node:child_process";
+function spawnDetached(cmd, args) {
+  const child = spawn(cmd, args, {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true
+  });
+  child.unref();
+  return child.pid;
+}
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err.code === "EPERM";
+  }
+}
+
 // src/narrate-hook.ts
 async function main() {
   const raw = await readStdin();
   const cfg = loadConfig();
   if (!cfg.enabled) return;
   const payload = parsePayload(raw);
-  ensureStateDir();
-  writeFileSync2(payloadPath(), JSON.stringify(payload), "utf8");
-  const here = dirname(fileURLToPath(import.meta.url));
-  const worker = join2(here, "narrate-worker.js");
-  spawnDetached(process.execPath, [worker]);
+  enqueuePayload(payload);
+  const owner = readOwnerPid();
+  if (!Number.isInteger(owner) || !isAlive(owner)) {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const worker = join3(here, "narrate-worker.js");
+    spawnDetached(process.execPath, [worker]);
+  }
+}
+function readOwnerPid() {
+  try {
+    return Number.parseInt(readFileSync3(workerPidPath(), "utf8").trim(), 10);
+  } catch {
+    return NaN;
+  }
 }
 main().catch(() => {
 }).finally(() => process.exit(0));

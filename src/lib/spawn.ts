@@ -35,13 +35,24 @@ export function isAlive(pid: number): boolean {
 }
 
 /**
- * Termina el árbol de procesos de un worker anterior (incluye su `speak` hijo).
- * POSIX: mata el process group completo (posible porque se lanzó con
- * detached: true). Windows: taskkill del árbol. Idempotente y silenciosa: si el
- * PID ya no existe, no hace nada.
+ * Opciones para la terminación de un árbol de procesos.
  */
-export function killWorkerTree(pid: number): void {
+export interface KillProcessTreeOpts {
+  /** Tiempo de gracia en ms tras SIGTERM antes de enviar SIGKILL (POSIX). */
+  killGraceMs?: number;
+}
+
+/**
+ * Mata el árbol de procesos de un PID. Windows: taskkill /T /F. POSIX:
+ * envía SIGTERM al grupo de procesos, espera la gracia y envía SIGKILL si
+ * persiste. Idempotente y silenciosa: si el PID ya no existe, no hace nada.
+ */
+export function killProcessTree(
+  pid: number,
+  opts: KillProcessTreeOpts = {},
+): void {
   if (!Number.isInteger(pid) || pid <= 0) return;
+  const graceMs = opts.killGraceMs ?? 2000;
   if (process.platform === "win32") {
     spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
       stdio: "ignore",
@@ -50,9 +61,27 @@ export function killWorkerTree(pid: number): void {
     return;
   }
   try {
-    // El PID del worker es también el PGID (lo creó con detached: true).
+    // El PID es el líder de su grupo de procesos (spawn con detached: true).
     process.kill(-pid, "SIGTERM");
   } catch {
     // Ya no existe el grupo, o no tenemos permiso: nada que hacer.
   }
+  if (graceMs > 0) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, graceMs);
+  }
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    // Ya terminó o no tenemos permiso.
+  }
+}
+
+/**
+ * Termina el árbol de procesos de un worker anterior (incluye su `speak` hijo).
+ * POSIX: mata el process group completo (posible porque se lanzó con
+ * detached: true). Windows: taskkill del árbol. Idempotente y silenciosa: si el
+ * PID ya no existe, no hace nada.
+ */
+export function killWorkerTree(pid: number): void {
+  killProcessTree(pid, { killGraceMs: 0 });
 }

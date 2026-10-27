@@ -98,8 +98,9 @@ Si el CLI no está en el `PATH`, el modelo no está en caché, o el daemon no re
 ## Troubleshooting
 
 **Logs.** Son dos juegos distintos y no conviene mezclarlos: `worker.log` es el log
-**del plugin** (el worker registra ahí sus exits, avisos y fallos), mientras que
-los logs **del motor** son ficheros propios en
+**del plugin** (el worker registra ahí sus exits, avisos y fallos, incluidos los
+timeouts de invocación al CLI), mientras que los logs **del motor** son ficheros
+propios en
 `data/logs/<familia>_<token>_<ms>.log` (p. ej. `daemon_…`, `qwen3-tts_…`). Para
 afinar el nivel de detalle del daemon puede configurarse `RUST_LOG`; no se promete
 ningún `status.path.log`, que no forma parte del contrato.

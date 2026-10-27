@@ -1,7 +1,8 @@
 // Generado por build.mjs (esbuild). No editar a mano; editar src/ y recompilar.
 
 // src/narrate-worker.ts
-import { appendFileSync, readFileSync as readFileSync2, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { appendFileSync, readFileSync as readFileSync3, rmSync as rmSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join4 } from "node:path";
 
 // src/lib/config.ts
 import { readFileSync, writeFileSync } from "node:fs";
@@ -37,8 +38,8 @@ function configPath() {
 function workerPidPath() {
   return join(stateDir(), "worker.pid");
 }
-function payloadPath() {
-  return join(stateDir(), "payload.json");
+function queueDir() {
+  return join(stateDir(), "queue");
 }
 function workerLogPath() {
   return join(stateDir(), "worker.log");
@@ -73,18 +74,103 @@ function emptyToUndef(v) {
   return typeof v === "string" && v.trim() !== "" ? v : void 0;
 }
 
-// src/lib/spawn.ts
-import { spawn, spawnSync } from "node:child_process";
-function isAlive(pid) {
+// src/lib/queue.ts
+import {
+  mkdirSync as mkdirSync2,
+  readFileSync as readFileSync2,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync as writeFileSync2
+} from "node:fs";
+import { join as join2 } from "node:path";
+
+// src/lib/hook-payload.ts
+function parsePayload(raw) {
   try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return err.code === "EPERM";
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed;
+  } catch {
+  }
+  return {};
+}
+
+// src/lib/queue.ts
+var MAX_PENDING = 64;
+var MAX_AGE_MS = 60 * 60 * 1e3;
+function listPending() {
+  const dir = queueDir();
+  try {
+    return readdirSync(dir).filter((f) => f.endsWith(".json") && !f.startsWith(".tmp-")).sort();
+  } catch {
+    return [];
   }
 }
-function killWorkerTree(pid) {
+function claimNext() {
+  const pending = listPending();
+  if (pending.length === 0) return void 0;
+  const file = join2(queueDir(), pending[0]);
+  let payload;
+  try {
+    payload = parsePayload(readFileSync2(file, "utf8"));
+  } catch {
+    payload = {};
+  }
+  try {
+    rmSync(file, { force: true });
+  } catch {
+  }
+  return { file, payload };
+}
+function pruneQueue(options) {
+  const max = options.max ?? MAX_PENDING;
+  const maxAgeMs = options.maxAgeMs ?? MAX_AGE_MS;
+  const pending = listPending();
+  const now = Date.now();
+  for (const name of pending) {
+    const file = join2(queueDir(), name);
+    try {
+      const mt = statSync(file).mtimeMs;
+      if (now - mt >= maxAgeMs) {
+        rmSync(file, { force: true });
+      }
+    } catch {
+    }
+  }
+  const remaining = listPending();
+  const exceso = remaining.length - max;
+  if (exceso > 0) {
+    for (let i = 0; i < exceso; i++) {
+      try {
+        rmSync(join2(queueDir(), remaining[i]), { force: true });
+      } catch {
+      }
+    }
+  }
+}
+function clearQueue() {
+  try {
+    for (const name of listPending()) {
+      rmSync(join2(queueDir(), name), { force: true });
+    }
+  } catch {
+  }
+}
+
+// src/lib/resolve-cli.ts
+import {
+  spawn as spawn2,
+  spawnSync as spawnSync2
+} from "node:child_process";
+import { existsSync, statSync as statSync2 } from "node:fs";
+import { delimiter, join as join3 } from "node:path";
+
+// src/lib/spawn.ts
+import { spawn, spawnSync } from "node:child_process";
+function killProcessTree(pid, opts = {}) {
   if (!Number.isInteger(pid) || pid <= 0) return;
+  const graceMs = opts.killGraceMs ?? 2e3;
   if (process.platform === "win32") {
     spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
       stdio: "ignore",
@@ -96,15 +182,16 @@ function killWorkerTree(pid) {
     process.kill(-pid, "SIGTERM");
   } catch {
   }
+  if (graceMs > 0) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, graceMs);
+  }
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+  }
 }
 
 // src/lib/resolve-cli.ts
-import {
-  spawn as spawn2,
-  spawnSync as spawnSync2
-} from "node:child_process";
-import { existsSync, statSync } from "node:fs";
-import { delimiter, join as join2 } from "node:path";
 var BASE = "ai-voice-interconnector";
 function candidateNames() {
   if (process.platform !== "win32") return [BASE];
@@ -117,9 +204,9 @@ function resolveCli() {
   const names = candidateNames();
   for (const dir of dirs) {
     for (const name of names) {
-      const full = join2(dir, name);
+      const full = join3(dir, name);
       try {
-        if (existsSync(full) && statSync(full).isFile()) return full;
+        if (existsSync(full) && statSync2(full).isFile()) return full;
       } catch {
       }
     }
@@ -140,15 +227,37 @@ function buildShellCommand(cli, args) {
 function spawnCli(cli, args, opts) {
   return needsShell(cli) ? spawn2(buildShellCommand(cli, args), { ...opts, shell: true }) : spawn2(cli, args, { ...opts, shell: false });
 }
-
-// src/lib/hook-payload.ts
-function parsePayload(raw) {
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") return parsed;
-  } catch {
-  }
-  return {};
+function runCliWithTimeout(cli, args, opts) {
+  const { timeoutMs, killGraceMs = 2e3, ...spawnOpts } = opts;
+  const child = spawnCli(cli, args, {
+    ...spawnOpts,
+    detached: process.platform !== "win32",
+    stdio: "ignore",
+    windowsHide: true
+  });
+  let resolved = false;
+  let timer;
+  return new Promise((resolve) => {
+    const finish = (code, signal, timedOut, error) => {
+      if (resolved) return;
+      resolved = true;
+      if (timer) clearTimeout(timer);
+      resolve({ code, signal, timedOut, error });
+    };
+    timer = setTimeout(() => {
+      killProcessTree(child.pid ?? 0, { killGraceMs });
+      finish(codeOrNull(child), "SIGKILL", true);
+    }, timeoutMs);
+    child.on("error", (err) => {
+      finish(null, null, false, err);
+    });
+    child.on("exit", (code, signal) => {
+      finish(code, signal, false);
+    });
+  });
+}
+function codeOrNull(child) {
+  return typeof child.exitCode === "number" ? child.exitCode : null;
 }
 
 // src/message/prompts.ts
@@ -362,115 +471,112 @@ function log(msg) {
   } catch {
   }
 }
-var SINGLE_INSTANCE_WAIT_MS = 6e4;
-var POLL_INTERVAL_MS = 1e3;
+var PLAY_TIMEOUT_MS = 1e4;
+var SAY_TIMEOUT_MS = 45e3;
+var KILL_GRACE_MS = 2e3;
 var NARRATION_GAP_MS = 1e3;
+var IDLE_MS = 5e3;
+var IDLE_POLL_MS = 100;
 function sleepSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
-function readOwnerPid() {
+function acquireLock() {
   try {
-    return Number.parseInt(readFileSync2(workerPidPath(), "utf8").trim(), 10);
+    writeFileSync3(workerPidPath(), String(process.pid), {
+      encoding: "utf8",
+      flag: "wx"
+    });
+    return true;
   } catch {
-    return NaN;
+    return false;
   }
 }
-function takeSingleInstance() {
-  const deadline = Date.now() + SINGLE_INSTANCE_WAIT_MS;
-  while (Date.now() < deadline) {
-    const owner2 = readOwnerPid();
-    if (owner2 === process.pid) return;
-    if (Number.isInteger(owner2) && isAlive(owner2)) {
-      sleepSync(POLL_INTERVAL_MS);
-      continue;
-    }
-    try {
-      writeFileSync2(workerPidPath(), String(process.pid), "utf8");
-    } catch {
-    }
-    sleepSync(POLL_INTERVAL_MS);
-  }
-  const owner = readOwnerPid();
-  if (Number.isInteger(owner) && owner !== process.pid && isAlive(owner)) {
-    killWorkerTree(owner);
-  }
-  writeFileSync2(workerPidPath(), String(process.pid), "utf8");
-}
-function releaseSingleInstance() {
+function releaseLock() {
   try {
     const owner = Number.parseInt(
-      readFileSync2(workerPidPath(), "utf8").trim(),
+      readFileSync3(workerPidPath(), "utf8").trim(),
       10
     );
-    if (owner === process.pid) rmSync(workerPidPath(), { force: true });
+    if (owner === process.pid) rmSync2(workerPidPath(), { force: true });
   } catch {
   }
 }
-function readPayload() {
-  try {
-    return parsePayload(readFileSync2(payloadPath(), "utf8"));
-  } catch {
-    return {};
+async function runPlay(cliPath, label) {
+  const args = ["speech", "play", "--label", label];
+  const res = await runCliWithTimeout(cliPath, args, {
+    stdio: "ignore",
+    windowsHide: true,
+    timeoutMs: PLAY_TIMEOUT_MS,
+    killGraceMs: KILL_GRACE_MS
+  });
+  if (res.timedOut) {
+    log(`speech play timeout tras ${PLAY_TIMEOUT_MS} ms; proceso terminado`);
+    return;
+  }
+  if (res.code !== 0) {
+    const hint = res.code === 3 ? " (locuci\xF3n o voz no disponible; ejecuta narrate-ctl presynth)" : "";
+    log(`speech play sali\xF3 con c\xF3digo ${res.code}${hint}`);
   }
 }
-function runPlay(cliPath, label) {
-  return new Promise((resolve) => {
-    const args = ["speech", "play", "--label", label];
-    const child = spawnCli(cliPath, args, {
-      stdio: "ignore",
-      windowsHide: true
-    });
-    child.on("error", (err) => {
-      log(`speech play error: ${err.message}`);
-      resolve();
-    });
-    child.on("exit", (code) => {
-      if (code !== 0) {
-        const hint = code === 3 ? " (locuci\xF3n o voz no disponible; ejecuta narrate-ctl presynth)" : "";
-        log(`speech play sali\xF3 con c\xF3digo ${code}${hint}`);
-      }
-      resolve();
-    });
+async function runSay(cliPath, text) {
+  const args = ["speech", "say", "--text", text, "--daemon"];
+  const res = await runCliWithTimeout(cliPath, args, {
+    stdio: "ignore",
+    windowsHide: true,
+    timeoutMs: SAY_TIMEOUT_MS,
+    killGraceMs: KILL_GRACE_MS
   });
-}
-function runSay(cliPath, text) {
-  return new Promise((resolve) => {
-    const args = ["speech", "say", "--text", text, "--daemon"];
-    const child = spawnCli(cliPath, args, {
-      stdio: "ignore",
-      windowsHide: true
-    });
-    child.on("error", (err) => {
-      log(`speech say error: ${err.message}`);
-      resolve();
-    });
-    child.on("exit", (code) => {
-      if (code !== 0) log(`speech say sali\xF3 con c\xF3digo ${code}`);
-      resolve();
-    });
-  });
+  if (res.timedOut) {
+    log(`speech say timeout tras ${SAY_TIMEOUT_MS} ms; proceso terminado`);
+    return;
+  }
+  if (res.code !== 0) log(`speech say sali\xF3 con c\xF3digo ${res.code}`);
 }
 async function main() {
   ensureStateDir();
-  takeSingleInstance();
-  if (NARRATION_GAP_MS > 0) sleepSync(NARRATION_GAP_MS);
-  const cfg = loadConfig();
-  if (!cfg.enabled) return;
-  const payload = readPayload();
-  const request = await buildMessage(payload, cfg);
-  if (request.kind === "say" && !request.text) {
-    log("mensaje vac\xEDo tras la construcci\xF3n; nada que narrar");
-    return;
+  if (!acquireLock()) return;
+  try {
+    try {
+      rmSync2(join4(stateDir(), "payload.json"), { force: true });
+    } catch {
+    }
+    pruneQueue({ max: 64, maxAgeMs: 60 * 60 * 1e3 });
+    let lastActivity = Date.now();
+    while (true) {
+      const item = claimNext();
+      if (!item) {
+        if (Date.now() - lastActivity > IDLE_MS) break;
+        sleepSync(IDLE_POLL_MS);
+        continue;
+      }
+      lastActivity = Date.now();
+      const cfg = loadConfig();
+      if (!cfg.enabled) {
+        clearQueue();
+        return;
+      }
+      const request = await buildMessage(item.payload, cfg);
+      if (request.kind === "say" && !request.text) {
+        log("mensaje vac\xEDo tras la construcci\xF3n; nada que narrar");
+        continue;
+      }
+      const cli = resolveCli();
+      if (!cli) {
+        log(
+          "ai-voice-interconnector no encontrado en PATH; se omite la narraci\xF3n"
+        );
+        continue;
+      }
+      if (request.kind === "play") await runPlay(cli, request.label);
+      else await runSay(cli, request.text);
+      if (NARRATION_GAP_MS > 0) sleepSync(NARRATION_GAP_MS);
+    }
+  } finally {
+    releaseLock();
+    process.exit(0);
   }
-  const cli = resolveCli();
-  if (!cli) {
-    log("ai-voice-interconnector no encontrado en PATH; se omite la narraci\xF3n");
-    return;
-  }
-  if (request.kind === "play") await runPlay(cli, request.label);
-  else await runSay(cli, request.text);
 }
-main().catch((err) => log(`worker error: ${err?.message ?? err}`)).finally(() => {
-  releaseSingleInstance();
+main().catch((err) => {
+  log(`worker error: ${err?.message ?? err}`);
   process.exit(0);
 });

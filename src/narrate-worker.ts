@@ -4,18 +4,21 @@
 // Copyright (c) 2026 Cristián Rojas Arredondo.
 // SPDX-License-Identifier: MPL-2.0
 
-// WORKER (proceso independiente del hook). Hace todo el trabajo con latencia: instancia única que ESPERA al worker anterior en vez de interrumpirlo (la narración en curso suena completa antes de la siguiente; sin solapamiento), construcción del mensaje y narración vía el CLI. Degrada en silencio; los errores van a worker.log.
+// WORKER (proceso independiente del hook). Único consumidor de la cola FIFO en
+// disco: reclama un evento, lo narra y lo borra antes de pasar al siguiente, así
+// no hay solapamiento ni duplicación. Construye el mensaje y narra vía el CLI.
+// Degrada en silencio; los errores van a worker.log.
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { loadConfig } from "./lib/config.js";
 import {
   ensureStateDir,
-  payloadPath,
+  stateDir,
   workerLogPath,
   workerPidPath,
 } from "./lib/state-dir.js";
-import { isAlive, killWorkerTree } from "./lib/spawn.js";
-import { resolveCli, spawnCli } from "./lib/resolve-cli.js";
-import { parsePayload, type HookPayload } from "./lib/hook-payload.js";
+import { claimNext, clearQueue, pruneQueue } from "./lib/queue.js";
+import { resolveCli, runCliWithTimeout } from "./lib/resolve-cli.js";
 import { buildMessage } from "./message/build-message.js";
 
 function log(msg: string): void {
@@ -26,58 +29,39 @@ function log(msg: string): void {
   }
 }
 
-// Tiempo máximo que un worker espera a que el anterior termine su narración antes de, como último recurso, interrumpirlo (evita espera indefinida si se cuelga). Cubre varias narraciones encadenadas (~20 s cada una).
-const SINGLE_INSTANCE_WAIT_MS = 60_000;
+// Timeout de invocación CLI por tipo de narración.
+const PLAY_TIMEOUT_MS = 10_000;
+const SAY_TIMEOUT_MS = 45_000;
+const KILL_GRACE_MS = 2_000;
 
-// Intervalo de sondeo mientras hay un dueño vivo: el worker actual duerme y vuelve a comprobar el PID del dueño. 1 s = 1 sondeo/seg, lo bastante frecuente para encadenar sin demora visible y lo bastante espaciado para no burn I/O ni syscalls en un turno con cola larga (25 s ≈ 25 sondeos).
-const POLL_INTERVAL_MS = 1_000;
-
-// Pausa de respiración entre narraciones: cuando el worker anterior termina y este toma la plaza, espera este hueco antes de empezar a construir el texto y narrar. Evita que dos locuciones suenen pegadas y se vuelvan confusas, sobre todo en cadenas (UserPromptSubmit + Stop casi simultáneos).
+// Pausa de respiración entre narraciones: evita que dos locuciones suenen pegadas.
 const NARRATION_GAP_MS = 1_000;
+
+// Ventana de inactividad antes de salir si la cola queda vacía.
+const IDLE_MS = 5_000;
+const IDLE_POLL_MS = 100;
 
 /** Suspende el hilo actual de forma síncrona (sin event loop). */
 function sleepSync(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-/** Lee el PID dueño actual de la plaza, o NaN si no hay archivo. */
-function readOwnerPid(): number {
+/** Intenta adquirir el lock exclusivo del worker mediante worker.pid. Devuelve true si lo consiguió. */
+function acquireLock(): boolean {
   try {
-    return Number.parseInt(readFileSync(workerPidPath(), "utf8").trim(), 10);
+    writeFileSync(workerPidPath(), String(process.pid), {
+      encoding: "utf8",
+      flag: "wx",
+    });
+    return true;
   } catch {
-    return NaN;
+    // Otro worker ya es dueño de la plaza.
+    return false;
   }
 }
 
-/**
- * Instancia única SIN interrumpir la narración en curso: espera (acotado) a que el worker anterior termine, en vez de matarlo, para que la locución previa suene completa antes de la siguiente y no se solapen. El reclamo de la plaza de PID se hace en bucle: si otro worker la tomó, se espera a él, formando una cadena ordenada y libre de carreras. Si el anterior se cuelga, tras el tope se interrumpe como medida de último recurso.
- */
-function takeSingleInstance(): void {
-  const deadline = Date.now() + SINGLE_INSTANCE_WAIT_MS;
-  while (Date.now() < deadline) {
-    const owner = readOwnerPid();
-    if (owner === process.pid) return; // soy dueño de la plaza: procedo
-    if (Number.isInteger(owner) && isAlive(owner)) {
-      sleepSync(POLL_INTERVAL_MS); // dueño vivo: espero a que termine su narración
-      continue;
-    }
-    // Plaza libre (sin dueño o dueño muerto): intento reclamarla.
-    try {
-      writeFileSync(workerPidPath(), String(process.pid), "utf8");
-    } catch {
-      // Otro la tomó en paralelo; el bucle reevalúa el dueño.
-    }
-    sleepSync(POLL_INTERVAL_MS);
-  }
-  // Tope de seguridad: si no pude sincronizar, interrumpo a cualquier dueño vivo.
-  const owner = readOwnerPid();
-  if (Number.isInteger(owner) && owner !== process.pid && isAlive(owner)) {
-    killWorkerTree(owner);
-  }
-  writeFileSync(workerPidPath(), String(process.pid), "utf8");
-}
-
-function releaseSingleInstance(): void {
+/** Libera el lock solo si aún somos nosotros el dueño. */
+function releaseLock(): void {
   try {
     const owner = Number.parseInt(
       readFileSync(workerPidPath(), "utf8").trim(),
@@ -89,94 +73,112 @@ function releaseSingleInstance(): void {
   }
 }
 
-function readPayload(): HookPayload {
-  try {
-    return parsePayload(readFileSync(payloadPath(), "utf8"));
-  } catch {
-    return {};
+/**
+ * Ejecuta `speech play --label <label>` con timeout. Política de fallo: cualquier
+ * exit ≠ 0 (incluido el `3` de cache miss) se registra en worker.log y el turno
+ * queda sin audio — sin re-sintetizado ni fallback a `speech say`.
+ */
+async function runPlay(cliPath: string, label: string): Promise<void> {
+  const args = ["speech", "play", "--label", label];
+  const res = await runCliWithTimeout(cliPath, args, {
+    stdio: "ignore",
+    windowsHide: true,
+    timeoutMs: PLAY_TIMEOUT_MS,
+    killGraceMs: KILL_GRACE_MS,
+  });
+  if (res.timedOut) {
+    log(`speech play timeout tras ${PLAY_TIMEOUT_MS} ms; proceso terminado`);
+    return;
+  }
+  if (res.code !== 0) {
+    const hint =
+      res.code === 3
+        ? " (locución o voz no disponible; ejecuta narrate-ctl presynth)"
+        : "";
+    log(`speech play salió con código ${res.code}${hint}`);
   }
 }
 
-/**
- * Ejecuta `ai-voice-interconnector speech play --label <label>`: reproduce un anuncio
- * pre-sintetizado, sin modelo ni daemon. Política de fallo: cualquier exit ≠ 0
- * (incluido el `3` de cache miss, anuncio no pre-sintetizado) se registra en worker.log
- * y el turno queda sin audio — sin re-sintetizado ni fallback a `speech say`.
- */
-function runPlay(cliPath: string, label: string): Promise<void> {
-  return new Promise((resolve) => {
-    const args = ["speech", "play", "--label", label];
-    const child = spawnCli(cliPath, args, {
-      stdio: "ignore",
-      windowsHide: true,
-    });
-    child.on("error", (err) => {
-      log(`speech play error: ${err.message}`);
-      resolve();
-    });
-    child.on("exit", (code) => {
-      if (code !== 0) {
-        const hint =
-          code === 3
-            ? " (locución o voz no disponible; ejecuta narrate-ctl presynth)"
-            : "";
-        log(`speech play salió con código ${code}${hint}`);
-      }
-      resolve();
-    });
+/** Ejecuta `speech say --text <texto> --daemon` con timeout. Resuelve al terminar. */
+async function runSay(cliPath: string, text: string): Promise<void> {
+  const args = ["speech", "say", "--text", text, "--daemon"];
+  const res = await runCliWithTimeout(cliPath, args, {
+    stdio: "ignore",
+    windowsHide: true,
+    timeoutMs: SAY_TIMEOUT_MS,
+    killGraceMs: KILL_GRACE_MS,
   });
-}
-
-/** Ejecuta `ai-voice-interconnector speech say --text <texto> --daemon`. Resuelve al terminar. */
-function runSay(cliPath: string, text: string): Promise<void> {
-  return new Promise((resolve) => {
-    const args = ["speech", "say", "--text", text, "--daemon"];
-    const child = spawnCli(cliPath, args, {
-      stdio: "ignore",
-      windowsHide: true,
-    });
-    child.on("error", (err) => {
-      log(`speech say error: ${err.message}`);
-      resolve();
-    });
-    child.on("exit", (code) => {
-      if (code !== 0) log(`speech say salió con código ${code}`);
-      resolve();
-    });
-  });
+  if (res.timedOut) {
+    log(`speech say timeout tras ${SAY_TIMEOUT_MS} ms; proceso terminado`);
+    return;
+  }
+  if (res.code !== 0) log(`speech say salió con código ${res.code}`);
 }
 
 async function main(): Promise<void> {
   ensureStateDir();
-  takeSingleInstance();
 
-  // Pausa de respiración: asegura un hueco audible entre esta narración y la anterior que acaba de terminar (evita que dos locuciones se encadenen sin pausa y se vuelven confusas). Cuando el worker actual es el único en la plaza, el gap se paga una vez al inicio y no afecta al turno siguiente.
-  if (NARRATION_GAP_MS > 0) sleepSync(NARRATION_GAP_MS);
+  // Lock exclusivo: si otro worker ya drena, este sale y deja que él lo haga.
+  if (!acquireLock()) return;
 
-  const cfg = loadConfig();
-  if (!cfg.enabled) return;
+  try {
+    // Limpieza de legado: eliminar payload.json si quedó de versiones previas.
+    try {
+      rmSync(join(stateDir(), "payload.json"), { force: true });
+    } catch {
+      // No existía o no se pudo borrar: seguir.
+    }
 
-  const payload = readPayload();
+    // Podar cola expirada y sobrante antes de empezar.
+    pruneQueue({ max: 64, maxAgeMs: 60 * 60 * 1000 });
 
-  const request = await buildMessage(payload, cfg);
-  if (request.kind === "say" && !request.text) {
-    log("mensaje vacío tras la construcción; nada que narrar");
-    return;
+    let lastActivity = Date.now();
+
+    while (true) {
+      const item = claimNext();
+      if (!item) {
+        // Nada pendiente: esperar un poco y reevaluar. Si pasa la ventana de
+        // inactividad, salir.
+        if (Date.now() - lastActivity > IDLE_MS) break;
+        sleepSync(IDLE_POLL_MS);
+        continue;
+      }
+      lastActivity = Date.now();
+
+      const cfg = loadConfig();
+      if (!cfg.enabled) {
+        // Narración desactivada: descartar el resto de la cola y salir.
+        clearQueue();
+        return;
+      }
+
+      const request = await buildMessage(item.payload, cfg);
+      if (request.kind === "say" && !request.text) {
+        log("mensaje vacío tras la construcción; nada que narrar");
+        continue;
+      }
+
+      const cli = resolveCli();
+      if (!cli) {
+        log(
+          "ai-voice-interconnector no encontrado en PATH; se omite la narración",
+        );
+        continue;
+      }
+
+      if (request.kind === "play") await runPlay(cli, request.label);
+      else await runSay(cli, request.text);
+
+      // Hueco entre narraciones para que no suenen pegadas.
+      if (NARRATION_GAP_MS > 0) sleepSync(NARRATION_GAP_MS);
+    }
+  } finally {
+    releaseLock();
+    process.exit(0);
   }
-
-  const cli = resolveCli();
-  if (!cli) {
-    log("ai-voice-interconnector no encontrado en PATH; se omite la narración");
-    return;
-  }
-
-  if (request.kind === "play") await runPlay(cli, request.label);
-  else await runSay(cli, request.text);
 }
 
-main()
-  .catch((err) => log(`worker error: ${err?.message ?? err}`))
-  .finally(() => {
-    releaseSingleInstance();
-    process.exit(0);
-  });
+main().catch((err) => {
+  log(`worker error: ${err?.message ?? err}`);
+  process.exit(0);
+});

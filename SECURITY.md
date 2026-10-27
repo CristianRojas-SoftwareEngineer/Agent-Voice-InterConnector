@@ -51,5 +51,5 @@ El plugin es un cliente delgado que corre dentro de la sesión de Claude Code de
 
 ### Cadena de suministro
 
-- El plugin se distribuye clonando el repo con `dist/` **commiteado**; lo que ejecutas es el JS del árbol de git. El CI verifica en cada push que `dist/` es exactamente la compilación de `src/` (`npm run check-dist`), de modo que el fuente publicado y el artefacto ejecutado no puedan divergir sin que el pipeline falle.
+- El plugin se distribuye clonando el repo con `dist/` **commiteado**; lo que ejecutas es el JS del árbol de git. El CI verifica en cada push a una rama que `dist/` es exactamente la compilación de `src/` (`npm run check-dist`); el pre-commit lo regenera al commitear y el checklist de release lo vuelve a comprobar. De este modo el fuente publicado y el artefacto ejecutado no pueden divergir sin que el pipeline falle.
 - No hay **ninguna dependencia de runtime**: los bundles solo usan la stdlib de Node y `fetch` nativo. Las dependencias de desarrollo (typescript, esbuild, @types/node) van fijadas por `package-lock.json` y no se instalan en la máquina del usuario final.

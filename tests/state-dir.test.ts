@@ -17,7 +17,7 @@ import {
   ensureStateDir,
   configPath,
   workerPidPath,
-  payloadPath,
+  queueDir,
   workerLogPath,
 } from "../src/lib/state-dir.js";
 import { fakePlatform, withEnv, makeTempDir, removeDir } from "./helpers.js";
@@ -83,7 +83,7 @@ test("Linux: cae a ~/.local/state si XDG_STATE_HOME falta", () => {
 test("las rutas derivadas cuelgan del state dir con sus nombres fijos", () => {
   assert.equal(configPath(), join(stateDir(), "config.json"));
   assert.equal(workerPidPath(), join(stateDir(), "worker.pid"));
-  assert.equal(payloadPath(), join(stateDir(), "payload.json"));
+  assert.equal(queueDir(), join(stateDir(), "queue"));
   assert.equal(workerLogPath(), join(stateDir(), "worker.log"));
 });
 

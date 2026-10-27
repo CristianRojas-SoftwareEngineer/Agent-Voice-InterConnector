@@ -13,24 +13,8 @@ verdad: ráfagas de hooks, un daemon que falla o tarda, y la necesidad de
 diagnosticar sin abrir una consola. La prioridad es que la narración siga siendo
 invisible cuando todo va bien y fácil de reparar cuando no.
 
-### Narración sin carreras
-
-El handoff actual —un `payload.json` compartido y un worker efímero por hook—
-funciona para el uso ocasional, pero no garantiza que cada worker lea el payload
-que le corresponde bajo ráfagas. La dirección es una cola FIFO persistente con
-un único consumidor:
-
-- Un solo worker persistente recibe los eventos y los reproduce en orden.
-- El orden deja de depender de una cerradura de PID o de una ventana de carrera.
-- El ciclo de vida se vuelve explícito: drenar y salir en `SessionEnd`.
-- La cola admite políticas: tope, descarte del evento más viejo y `pendientes: N`
-  en `narrate-ctl status`.
-- El costo de levantar un proceso por hook desaparece.
-
 ### Robustez y recuperación
 
-- Añadir timeout a las invocaciones `speech play` y `speech say` del worker, con
-  terminación del proceso hijo y registro en `worker.log`.
 - Reintentar `daemon start` con backoff cuando el daemon queda en `warming` y
   deriva en `warm_failed`.
 - Distinguir en el aviso de `SessionStart` entre modelo ausente

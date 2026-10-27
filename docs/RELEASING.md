@@ -163,6 +163,8 @@ Notas de contrato que el runbook asume (verificado en código fuente):
   (pipeline TTS + daemon); **no** ejercita la generación de mensaje (`local`/`llm`).
 - `worker.log` (en `$STATE_DIR`) registra **solo errores** de narración, no qué
   proveedor se usó; la distinción `local` vs `llm` se verifica **por audible**.
+  El CI verifica en cada push que `dist/` es la compilación de `src/`
+  (`npm run check-dist`), no solo en el pre-commit.
 - **Versión instalada vs. `$MOTOR_VERSION`**: `ai-voice-interconnector version`
   imprime la versión del motor con o sin el prefijo `v`; contrasta quitando
   **solo** ese prefijo a ambos lados antes de comparar (Fase 2, paso 1b):

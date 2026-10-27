@@ -5,16 +5,18 @@
 // SPDX-License-Identifier: MPL-2.0
 
 // LAUNCHER (fire-and-forget). Corre DENTRO del hook de Claude Code: lee el
-// payload, decide si narrar, lo persiste y lanza el worker desanclado. Debe
-// salir en <100 ms — nada de red, síntesis ni espera. Sirve a los cinco hooks
-// que narran (Stop, SubagentStop, StopFailure, UserPromptSubmit, Notification);
-// el worker distingue el evento por hook_event_name.
-import { writeFileSync } from "node:fs";
+// payload, decide si narrar, lo encola y lanza el worker desanclado solo si
+// no hay uno vivo drenando. Debe salir en <100 ms — nada de red, síntesis ni
+// espera. Sirve a los cinco hooks que narran (Stop, SubagentStop, StopFailure,
+// UserPromptSubmit, Notification); el worker distingue el evento por
+// hook_event_name.
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { loadConfig } from "./lib/config.js";
-import { ensureStateDir, payloadPath } from "./lib/state-dir.js";
-import { spawnDetached } from "./lib/spawn.js";
+import { workerPidPath } from "./lib/state-dir.js";
+import { enqueuePayload } from "./lib/queue.js";
+import { isAlive, spawnDetached } from "./lib/spawn.js";
 import { readStdin, parsePayload } from "./lib/hook-payload.js";
 
 async function main(): Promise<void> {
@@ -26,14 +28,25 @@ async function main(): Promise<void> {
 
   const payload = parsePayload(raw);
 
-  // Persistir el payload para el worker (traspaso launcher → worker).
-  ensureStateDir();
-  writeFileSync(payloadPath(), JSON.stringify(payload), "utf8");
+  // Encolar el payload para el worker (traspaso launcher → worker).
+  enqueuePayload(payload);
 
-  // Lanzar el worker desanclado con el mismo Node que ejecuta este launcher.
-  const here = dirname(fileURLToPath(import.meta.url));
-  const worker = join(here, "narrate-worker.js");
-  spawnDetached(process.execPath, [worker]);
+  // Lanzar el worker desanclado solo si no hay uno vivo drenando la cola.
+  const owner = readOwnerPid();
+  if (!Number.isInteger(owner) || !isAlive(owner)) {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const worker = join(here, "narrate-worker.js");
+    spawnDetached(process.execPath, [worker]);
+  }
+}
+
+/** Lee el PID dueño actual de la plaza, o NaN si no hay archivo. */
+function readOwnerPid(): number {
+  try {
+    return Number.parseInt(readFileSync(workerPidPath(), "utf8").trim(), 10);
+  } catch {
+    return NaN;
+  }
 }
 
 // El launcher nunca falla la sesión: cualquier error se traga y sale 0.

@@ -18,6 +18,16 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [No publicado]
 
+### Añadido
+
+- **Cola FIFO de narración en disco** (`src/lib/queue.ts`): los hooks encolan
+  payloads en `queue/` del state dir y un único worker drenador los narra en
+  orden, sin solapamiento ni duplicación. El handoff `payload.json` compartido
+  queda eliminado.
+- **Timeout de invocación CLI en el worker**: `speech play` (10 s) y
+  `speech say` (45 s) acotados con muerte del árbol de procesos al exceder el
+  tiempo, registro en `worker.log` y continuación de la cola.
+
 ### Cambiado
 
 - **La API key de Gemini vive solo en el entorno** (`GEMINI_API_KEY`).

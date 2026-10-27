@@ -17,6 +17,7 @@ import {
 } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
+import { killProcessTree } from "./spawn.js";
 
 const BASE = "ai-voice-interconnector";
 
@@ -105,4 +106,63 @@ export function spawnCli(
   return needsShell(cli)
     ? spawn(buildShellCommand(cli, args), { ...opts, shell: true })
     : spawn(cli, args, { ...opts, shell: false });
+}
+
+/**
+ * Resultado de una invocación con timeout.
+ */
+export interface CliRunWithTimeoutResult {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  error?: Error;
+}
+
+/**
+ * Invoca el CLI resuelto con un tiempo de espera y mata su árbol de procesos
+ * si se excede. En POSIX spawnea con `detached: true` para poder matar el
+ * grupo de procesos; en Windows usa taskkill /T /F. Devuelve una promesa que
+ * nunca rechaza.
+ */
+export function runCliWithTimeout(
+  cli: string,
+  args: string[],
+  opts: SpawnOptions & { timeoutMs: number; killGraceMs?: number },
+): Promise<CliRunWithTimeoutResult> {
+  const { timeoutMs, killGraceMs = 2000, ...spawnOpts } = opts;
+  const child = spawnCli(cli, args, {
+    ...spawnOpts,
+    detached: process.platform !== "win32",
+    stdio: "ignore",
+    windowsHide: true,
+  });
+  let resolved = false;
+  let timer: NodeJS.Timeout | undefined;
+  return new Promise<CliRunWithTimeoutResult>((resolve) => {
+    const finish = (
+      code: number | null,
+      signal: NodeJS.Signals | null,
+      timedOut: boolean,
+      error?: Error,
+    ) => {
+      if (resolved) return;
+      resolved = true;
+      if (timer) clearTimeout(timer);
+      resolve({ code, signal, timedOut, error });
+    };
+    timer = setTimeout(() => {
+      killProcessTree(child.pid ?? 0, { killGraceMs });
+      finish(codeOrNull(child), "SIGKILL", true);
+    }, timeoutMs);
+    child.on("error", (err) => {
+      finish(null, null, false, err);
+    });
+    child.on("exit", (code, signal) => {
+      finish(code, signal, false);
+    });
+  });
+}
+
+function codeOrNull(child: ChildProcess): number | null {
+  return typeof child.exitCode === "number" ? child.exitCode : null;
 }
