@@ -71,16 +71,17 @@ Tras instalar por cualquier vía, **verifica**: `ai-voice-interconnector version
 ai-voice-interconnector setup
 ```
 
-`setup` provisiona la selección de **cinco modelos** (idempotente; el instalador del
+`setup` provisiona la selección de **seis modelos** (idempotente; el instalador del
 Paso 1 ya lo encadena, así que normalmente esto solo confirma el estado):
 
 - `qwen3-tts-0.6b` (CustomVoice) y `qwen3-tts-0.6b-base` (Base): el modelo **Base es
   requerido por las voces clonadas**, incluida la voz de fábrica `default`.
 - `opus-mt-es-en` y `opus-mt-en-es` (traducción) y `parakeet-tdt-v3` (STT).
+- `dpdfnet8` (limpieza de ruido): opcional para arrancar el daemon y necesario para las operaciones que solicitan `--denoise`.
 
 Advertencias a comunicar:
 
-- Las descargas son **grandes** (varios cientos de MB) y pueden tardar.
+- La selección completa requiere aproximadamente **5,9 GB** de descarga y puede tardar.
 - El acceso **gated** de HuggingFace puede afectar a **algunos** modelos, no a todos:
   si `setup` reporta un problema de autorización, guía al usuario a aceptar las
   condiciones del modelo afectado en su cuenta de HuggingFace (o definir `HF_TOKEN`)

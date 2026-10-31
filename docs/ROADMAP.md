@@ -31,8 +31,7 @@ invisible cuando todo va bien y fácil de reparar cuando no.
   consumo de tokens.
 - Comando `doctor` del plugin: CLI del motor, modelos, daemon, clave de entorno y
   preferencias en una sola pasada.
-- `narrate-ctl status` con el estado de la cola (`pendientes`, worker activo)
-  cuando exista la cola FIFO.
+- `narrate-ctl status` con el estado de la cola FIFO existente (`pendientes`, worker activo).
 
 ### Configuración
 
@@ -63,8 +62,8 @@ perder la fidelidad al turno ni la privacidad por defecto.
 ### Voz y streaming
 
 - `speech say --stream` para reproducir mientras el motor sintetiza.
-- Clonación de voz del usuario (`voice clone --name mine`) cuando el motor la
-  exponga.
+- Integrar en el plugin la clonación de voz que ya expone el motor, según la
+  [especificación propuesta](specs/VOICE_CLONING.md).
 - Mostrar la operación en curso (síntesis, clonación, doblaje) en `status`.
 
 ### Distribución

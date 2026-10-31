@@ -25,7 +25,7 @@ Plugin de [Claude Code](https://code.claude.com) que **narra por voz** la activi
 /agent-voice-interconnector:install
 ```
 
-El comando de instalación guía todo el proceso: detecta tu SO, instala el binario nativo, descarga los 5 modelos, levanta el daemon, pre-sintetiza los 6 anuncios estáticos y activa la narración.
+El comando de instalación guía todo el proceso: detecta tu SO, instala el binario nativo, descarga los 6 modelos, levanta el daemon, pre-sintetiza los 6 anuncios estáticos y activa la narración.
 
 ---
 
